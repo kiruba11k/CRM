@@ -157,3 +157,17 @@ td .sub { font-size: 12px; color: var(--ink-soft); }
 /* Login */
 .login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
 .login .card { width: min(420px, 100%); align-items: flex-start; }
+
+/* Reports, settings, meetings, import */
+.bar-row { display: grid; grid-template-columns: minmax(110px, 160px) 1fr auto; gap: 10px; align-items: center; font-size: 13px; }
+.bar-track { height: 12px; background: var(--line-soft); border-radius: 999px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 999px; }
+.steps { display: flex; flex-wrap: wrap; gap: 8px; }
+.steps button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-weight: 600; color: var(--ink-soft); }
+.steps button[aria-current="step"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.steps button.done { background: var(--teal-soft); border-color: #A9D9CC; color: var(--teal-ink); }
+.list-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.list-row:first-child { border-top: 0; }
+.side-list { display: flex; flex-direction: column; gap: 2px; }
+.side-list button { text-align: left; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 0; background: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.side-list button[aria-pressed="true"] { background: var(--paper-deep); font-weight: 700; }

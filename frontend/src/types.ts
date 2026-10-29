@@ -37,7 +37,7 @@ export interface Prospect {
   id: string; full_name: string; account_id: string | null; job_title: string | null; email: string | null; phone: string | null
   linkedin_url: string | null; owner_id: string | null; status: string; disqualified_reason: string | null; source: string | null
   next_action_code: string | null; next_action_other: string | null; next_action_due: string | null; notes: string | null
-  account_name?: string | null; geography?: string | null; owner_name?: string | null
+  account_name?: string | null; geography?: string | null; owner_name?: string | null; created_at?: string
 }
 
 export interface Opportunity {
@@ -50,7 +50,7 @@ export interface Opportunity {
   proposal_due: string | null; delivery_lead: string | null; effort_estimate: string | null
   actual_value: Money; won_date: string | null; lost_date: string | null; lost_reason: string | null; lost_notes: string | null
   probability: number; weighted_value: Money; next_action_label: string
-  account_name?: string; owner_name?: string | null
+  account_name?: string; owner_name?: string | null; created_at?: string
 }
 
 export interface OpportunityDetail extends Opportunity {

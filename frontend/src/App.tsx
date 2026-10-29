@@ -12,10 +12,15 @@ import OpportunityRecord from './pages/OpportunityRecord'
 import Accounts from './pages/Accounts'
 import AccountRecord from './pages/AccountRecord'
 import Views from './pages/Views'
+import Reports from './pages/Reports'
+import Meetings from './pages/Meetings'
+import Settings from './pages/Settings'
+import Import from './pages/Import'
 
 const NAV: [string, [string, string][]][] = [
   ['Daily work', [['/', 'My Actions'], ['/prospects', 'Prospects'], ['/pipeline', 'Pipeline'], ['/accounts', 'Accounts']]],
-  ['Views & reporting', [['/views', 'Forecast & views']]],
+  ['Views & reporting', [['/views', 'Forecast & views'], ['/reports', 'Reports']]],
+  ['Google & admin', [['/meetings', 'Meetings & booking'], ['/settings', 'Settings'], ['/import', 'Import from HubSpot']]],
 ]
 
 function Login() {
@@ -98,6 +103,10 @@ export default function App() {
           <Route path="/accounts" element={<Accounts />} />
           <Route path="/accounts/:id" element={<AccountRecord />} />
           <Route path="/views" element={<Views />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/meetings" element={<Meetings />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/import" element={<Import />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

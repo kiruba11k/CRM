@@ -18,9 +18,10 @@ integration. Staff only (Google Workspace sign-in).
 |---|---|---|
 | 1 | Database, API, all spec validation rules, Google sign-in, roles, history, My Actions, pipeline/forecast totals, CSV export, tests | **Done** (`backend/`) |
 | 2 | Frontend: My Actions, Prospects, Pipeline, Opportunity/Prospect/Account records, quick create, saved views | **Done** (`frontend/`) |
-| 3 | HubSpot import (accounts, contacts, deals, activity history) | Planned |
-| 4 | Google Calendar + Meet, booking links, Gmail contextual links | Planned (Gmail links done) |
-| 5 | Reports page, editable controlled lists, launch checklist | Planned |
+| 2b | Frontend: Reports & metrics, Settings (lists, reminders, users & roles, integrations, export & backup, launch checklist), Meetings & booking links, Import from HubSpot | **Done**: Reports, users & roles, CSV export live; Meetings opens a pre-filled Google Calendar event and logs it; Import is a review-only wizard until Phase 3 |
+| 3 | HubSpot import backend (accounts, contacts, deals, activity history) | Planned (UI ready) |
+| 4 | Google Calendar + Meet API sync, shared booking links | Planned (Gmail links and Calendar hand-off done) |
+| 5 | Editable controlled lists, reminder toggles, shared launch checklist | Planned (Reports done) |
 
 ## Layout
 
@@ -34,7 +35,7 @@ backend/
   tests/               rule tests (no DB) + API tests (real Postgres)
 frontend/
   src/types.ts         TypeScript types for every API response
-  src/pages/           My Actions, Prospects, Pipeline, records, views (.tsx)
+  src/pages/           My Actions, Prospects, Pipeline, records, views, Reports, Settings, Meetings, Import (.tsx)
   src/components/      quick create, activity timeline + history
 render.yaml            Render blueprint: API + static site, both on the free plan
 ```
