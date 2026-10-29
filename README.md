@@ -135,6 +135,15 @@ How it behaves:
    the connection string. The direct one (host without `-pooler`) is
    recommended; the pooled one also works. Tables are created automatically
    on the API's first start.
+   **Free plan settings:** pick the region closest to your Render region
+   (e.g. AWS Frankfurt with Render Frankfurt). Under **Branches → main →
+   Compute**, set the autoscaling **maximum to 0.25 CU**: the free plan's
+   monthly CU-hours then cover about 400 active hours, plenty for working
+   hours, because the database suspends after 5 minutes idle (always on in
+   Free) and the API closes idle connections after 2 minutes so it can.
+   Free storage (1 GB per project at the time of writing) holds years of
+   CRM records; check Neon's plans page for current limits. If the CU-hours
+   run out, Neon suspends the database until the next month or an upgrade.
 2. **Google:** in Google Cloud, create an OAuth client (type *Web*) for an app
    with user type **Internal**. Add the static site's URL to *Authorised
    JavaScript origins*.
