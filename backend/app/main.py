@@ -11,7 +11,7 @@ from loguru import logger
 
 from .config import get_settings
 from .db import create_pool, migrate
-from .routers import accounts, actions, admin, opportunities, prospects, reports
+from .routers import accounts, actions, admin, hubspot_import, opportunities, prospects, reports
 
 
 @asynccontextmanager
@@ -21,7 +21,11 @@ async def lifespan(app: FastAPI):
         logger.warning("CRM_DEV_AUTH is ON: X-Dev-User headers are trusted. Never use this in production.")
     app.state.pool = await create_pool(settings.database_url)
     await migrate(app.state.pool)
+    await hubspot_import.mark_interrupted(app.state.pool)
+    app.state.import_tasks = set()
     yield
+    for task in app.state.import_tasks:
+        task.cancel()
     await app.state.pool.close()
 
 
@@ -35,7 +39,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         allow_credentials=False,
     )
-    for r in (accounts, prospects, opportunities, actions, reports, admin):
+    for r in (accounts, prospects, opportunities, actions, reports, admin, hubspot_import):
         app.include_router(r.router, prefix="/api")
 
     @app.get("/health", tags=["health"])

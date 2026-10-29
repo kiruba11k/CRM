@@ -18,8 +18,8 @@ integration. Staff only (Google Workspace sign-in).
 |---|---|---|
 | 1 | Database, API, all spec validation rules, Google sign-in, roles, history, My Actions, pipeline/forecast totals, CSV export, tests | **Done** (`backend/`) |
 | 2 | Frontend: My Actions, Prospects, Pipeline, Opportunity/Prospect/Account records, quick create, saved views | **Done** (`frontend/`) |
-| 2b | Frontend: Reports & metrics, Settings (lists, reminders, users & roles, integrations, export & backup, launch checklist), Meetings & booking links, Import from HubSpot | **Done**: Reports, users & roles, CSV export live; Meetings opens a pre-filled Google Calendar event and logs it; Import is a review-only wizard until Phase 3 |
-| 3 | HubSpot import backend (accounts, contacts, deals, activity history) | Planned (UI ready) |
+| 2b | Frontend: Reports & metrics, Settings (lists, reminders, users & roles, integrations, export & backup, launch checklist), Meetings & booking links, Import from HubSpot | **Done**: Reports, users & roles, CSV export live; Meetings opens a pre-filled Google Calendar event and logs it |
+| 3 | HubSpot import: owners, companies, contacts, deals, associations, notes/calls/meetings/tasks, logged emails; re-runnable; Needs cleanup queue | **Done** (`backend/app/importer.py`) |
 | 4 | Google Calendar + Meet API sync, shared booking links | Planned (Gmail links and Calendar hand-off done) |
 | 5 | Editable controlled lists, reminder toggles, shared launch checklist | Planned (Reports done) |
 
@@ -30,12 +30,14 @@ backend/
   app/domain.py        spec rules: lists, stages, validation, follow-up logic (no I/O)
   app/migrations/      plain SQL, applied in order on startup
   app/auth.py          Google ID-token sign-in (Workspace domain only) + role checks
-  app/routers/         accounts, prospects, opportunities, actions, reports, admin
+  app/routers/         accounts, prospects, opportunities, actions, reports, admin, hubspot_import
+  app/hubspot.py       read-only HubSpot CRM v3 client (paging, 429 retry)
+  app/importer.py      HubSpot → CRM mapping and the import run
   scripts/seed_demo.py sample data for a local dev database
   tests/               rule tests (no DB) + API tests (real Postgres)
 frontend/
   src/types.ts         TypeScript types for every API response
-  src/pages/           My Actions, Prospects, Pipeline, records, views, Reports, Settings, Meetings, Import (.tsx)
+  src/pages/           My Actions, Prospects, Pipeline, records, views, Reports, Settings, Meetings, Import, Needs cleanup (.tsx)
   src/components/      quick create, activity timeline + history
 render.yaml            Render blueprint: API + static site, both on the free plan
 ```
@@ -87,12 +89,45 @@ frontend (`.github/workflows/frontend-checks.yml`).
 | Duplicate accounts | normalised name key (unique) + `GET /api/accounts/duplicates?name=`, warning in quick create |
 | §3 statuses, stages, probabilities, weighted value | `domain.STAGES`, `GET /api/lists`, `GET /api/reports/pipeline`, Pipeline page |
 | §4 risk rating, Put on Nurture?, revisit outcomes | `domain.validate_opportunity`, `POST /api/opportunities/{id}/revisit`, My Actions revisit panel |
-| §5 Next Action list, “Other” ≤ 50 chars, mandatory follow-up | `domain.NEXT_ACTIONS`, `POST …/complete-action`, `NextActionFields` in `frontend/src/ui.jsx` |
+| §5 Next Action list, “Other” ≤ 50 chars, mandatory follow-up | `domain.NEXT_ACTIONS`, `POST …/complete-action`, `NextActionFields` in `frontend/src/ui.tsx` |
 | §5.4 escalation after N business days | `GET /api/actions` (`escalated`), `CRM_ESCALATION_BUSINESS_DAYS` |
 | §7 views | My Actions, Prospects, Pipeline, Forecast & views pages |
 | §8.1 roles (proposed: confirm) | `auth.py`: salesperson edits own records; manager/admin edit all; admin manages users |
 | §8.3 history & audit | `record_history` table, history panel on every record, `GET /api/export/history.csv` |
 | Currencies never summed | every total is keyed by currency |
+| HubSpot import | `app/importer.py`, `/api/import/hubspot/*`, Import page; rule-breaking records listed at `/api/import/cleanup` (Needs cleanup page) |
+
+## HubSpot import
+
+1. In HubSpot (super-admin): **Settings → Integrations → Private apps →
+   Create a private app** with read-only scopes for companies, contacts,
+   deals and owners, plus notes, calls, meetings, tasks and emails if you
+   want activity history. Private apps cost nothing extra on any plan.
+2. Set the token as `CRM_HUBSPOT_TOKEN` on the API service in Render. It is
+   never typed into the browser.
+3. In the CRM, as an admin: **Import from HubSpot** → test the connection,
+   choose objects, check the stage mapping, review the data-quality check,
+   then start the import and watch its progress.
+
+How it behaves:
+
+- **Re-runnable.** Every record keeps its HubSpot ID. Running it again
+  refreshes records the import created, adds new ones and never
+  duplicates. Records someone has edited in the CRM since, and records that
+  already existed in the CRM before the import (matched by company domain or
+  name, or contact email), are kept as they are.
+- **Nothing is dropped or silently fixed.** Records that break a CRM rule
+  (no next step, Qualified with no value or risk rating, Won with no value,
+  no company, unmatched owner) are imported and listed in **Needs cleanup**
+  for their owner. Saving a fixed record removes it from the list.
+- **Owners** are matched by work email; leadstrategus.com owners without a
+  CRM user are added as salespeople. Other owners' records go to the admin
+  who ran the import, flagged.
+- **Emails:** only subject, date and direction are stored, never bodies.
+- **Free tier:** keep the Import page open until it finishes. Render's free
+  API sleeps when nothing is calling it, which would interrupt a long
+  import; the open page polls the progress and keeps it awake. An
+  interrupted run is marked as such and can simply be run again.
 
 ## Deploy: Render (free) + Neon (free)
 

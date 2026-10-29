@@ -54,13 +54,18 @@ async def insert(con: asyncpg.Connection, table: str, data: dict) -> dict:
     return dict(row)
 
 
+# Every update has passed validation, so a saved record leaves the
+# "Needs cleanup" queue it may have entered on import.
+_CLEARS_CLEANUP = {t: ", cleanup_reasons = '{}'" for t in ("accounts", "prospects", "opportunities")}
+
+
 async def update(con: asyncpg.Connection, table: str, id_: UUID, data: dict) -> dict:
     if not data:
         return await get_or_404(con, table, id_, table)
     cols = list(data)
     sets = ", ".join(f"{c} = ${i}" for i, c in enumerate(cols, start=2))
     row = await con.fetchrow(
-        f"UPDATE {table} SET {sets}, updated_at = now() WHERE id = $1 RETURNING *", id_, *data.values()
+        f"UPDATE {table} SET {sets}, updated_at = now(){_CLEARS_CLEANUP.get(table, '')} WHERE id = $1 RETURNING *", id_, *data.values()
     )
     return dict(row)
 

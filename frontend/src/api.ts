@@ -92,15 +92,19 @@ export async function api<T = unknown>(path: string, { method = 'GET', body, par
   return data as T
 }
 
-// CSV download needs the auth header, so fetch it and hand the browser a blob.
-export async function downloadCsv(entity: 'accounts' | 'prospects' | 'opportunities' | 'history'): Promise<void> {
+// CSV downloads need the auth header, so fetch them and hand the browser a blob.
+export async function downloadFile(path: string, filename: string, forbidden = 'You don’t have access to this download.'): Promise<void> {
   const headers: Record<string, string> = DEV_USER ? { 'X-Dev-User': DEV_USER } : { Authorization: `Bearer ${token}` }
-  const res = await fetch(`${BASE}/api/export/${entity}.csv`, { headers })
-  if (!res.ok) throw new ApiError(res.status, res.status === 403 ? 'CSV export is for managers and admins.' : 'Export failed.')
+  const res = await fetch(`${BASE}/api${path}`, { headers })
+  if (!res.ok) throw new ApiError(res.status, res.status === 403 ? forbidden : 'Download failed.')
   const blob = await res.blob()
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = `crm-${entity}.csv`
+  a.download = filename
   a.click()
   URL.revokeObjectURL(a.href)
+}
+
+export function downloadCsv(entity: 'accounts' | 'prospects' | 'opportunities' | 'history'): Promise<void> {
+  return downloadFile(`/export/${entity}.csv`, `crm-${entity}.csv`, 'CSV export is for managers and admins.')
 }

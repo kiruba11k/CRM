@@ -184,6 +184,7 @@ function RolesTab() {
 const INTEGRATIONS: [string, string, string, 'live' | 'planned' | 'later'][] = [
   ['Google sign-in (Workspace)', 'Priority 1', 'Only leadstrategus.com accounts can sign in. The Google app is set to Internal.', 'live'],
   ['Gmail: contextual links', 'Priority 2', 'Search and compose links on accounts, prospects and opportunities. No mail is copied into the CRM.', 'live'],
+  ['HubSpot import', 'Pilot', 'Read-only private-app token on the server (CRM_HUBSPOT_TOKEN). Re-runnable; never overwrites records edited in the CRM.', 'live'],
   ['Google Calendar + Meet', 'Priority 1', 'Create, update and cancel events for meetings and actions. Per-user sign-in, event ID stored to prevent duplicates, sync status and retry shown. Booking links use free/busy.', 'planned'],
   ['Gmail: thread association', 'Later, if useful', 'Link a specific thread to a record, storing only the thread ID and minimal metadata.', 'later'],
   ['Google Tasks', 'Optional', 'Mirror next actions into Google Tasks. Deferred unless it proves worth the extra sign-in work.', 'later'],

@@ -16,10 +16,11 @@ import Reports from './pages/Reports'
 import Meetings from './pages/Meetings'
 import Settings from './pages/Settings'
 import Import from './pages/Import'
+import Cleanup from './pages/Cleanup'
 
 const NAV: [string, [string, string][]][] = [
   ['Daily work', [['/', 'My Actions'], ['/prospects', 'Prospects'], ['/pipeline', 'Pipeline'], ['/accounts', 'Accounts']]],
-  ['Views & reporting', [['/views', 'Forecast & views'], ['/reports', 'Reports']]],
+  ['Views & reporting', [['/views', 'Forecast & views'], ['/reports', 'Reports'], ['/cleanup', 'Needs cleanup']]],
   ['Google & admin', [['/meetings', 'Meetings & booking'], ['/settings', 'Settings'], ['/import', 'Import from HubSpot']]],
 ]
 
@@ -107,6 +108,7 @@ export default function App() {
           <Route path="/meetings" element={<Meetings />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/import" element={<Import />} />
+          <Route path="/cleanup" element={<Cleanup />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

@@ -9,3 +9,5 @@ loguru
 # Verifies Google Workspace ID tokens at sign-in
 google-auth
 requests
+# HubSpot import (read-only CRM API)
+httpx

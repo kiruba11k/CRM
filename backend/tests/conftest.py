@@ -38,7 +38,7 @@ async def _truncate():
     con = await asyncpg.connect(RAW_DB)
     try:
         await con.execute(
-            "TRUNCATE record_history, activities, opportunity_team, opportunities, prospects, accounts, users RESTART IDENTITY CASCADE"
+            "TRUNCATE import_runs, record_history, activities, opportunity_team, opportunities, prospects, accounts, users RESTART IDENTITY CASCADE"
         )
     finally:
         await con.close()
@@ -49,7 +49,7 @@ def app():
     if not TEST_DB:
         pytest.skip("CRM_TEST_DATABASE_URL not set: skipping API tests")
     os.environ.update(
-        CRM_DATABASE_URL=TEST_DB, CRM_DEV_AUTH="true", CRM_ADMIN_EMAILS=ADMIN, CRM_ALLOWED_DOMAIN="leadstrategus.com"
+        CRM_DATABASE_URL=TEST_DB, CRM_DEV_AUTH="true", CRM_ADMIN_EMAILS=ADMIN, CRM_ALLOWED_DOMAIN="leadstrategus.com", CRM_HUBSPOT_TOKEN="test-token"
     )
     from app.config import get_settings
 

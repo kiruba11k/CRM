@@ -28,6 +28,8 @@ services:
         sync: false   # comma-separated; become admins on first sign-in
       - key: CRM_DEV_AUTH
         value: "false"
+      - key: CRM_HUBSPOT_TOKEN
+        sync: false   # HubSpot private app (read-only scopes); only needed for the import
 
   - type: web
     name: leadstrategus-crm

@@ -92,3 +92,29 @@ export interface ForecastPeriod { period: string; count: number; unweighted: Cur
 export type FormValue = string | number | boolean | null | undefined | string[]
 export type FormValues = Record<string, FormValue>
 export type FieldErrors = Record<string, string>
+
+// HubSpot import (backend/app/routers/hubspot_import.py)
+export type ImportObject = 'owners' | 'companies' | 'contacts' | 'deals' | 'associations' | 'activity' | 'emails'
+export type RunStatus = 'running' | 'succeeded' | 'failed' | 'interrupted'
+export interface ImportPhase { done: number; total: number | null; state: 'waiting' | 'running' | 'done' }
+export interface ImportRun {
+  id: string; status: RunStatus; message: string | null; started_at: string; finished_at: string | null
+  options: { objects?: ImportObject[]; stage_map?: Record<string, string> }
+  progress: Partial<Record<'owners' | 'companies' | 'contacts' | 'deals' | 'activity', ImportPhase>>
+  counts: Record<string, Record<'created' | 'updated' | 'kept' | 'merged' | 'failed', number>>
+  error_count: number; errors?: { object: string; hubspot_id: string | null; message: string }[]
+}
+export interface ImportStatus { configured: boolean; last_run: ImportRun | null }
+export interface HubSpotTest { portal_id: number | null; ui_domain: string | null; currency: string | null; time_zone: string | null; owners: number }
+export interface HubSpotSummary {
+  totals: Record<string, number | null>
+  missing_scopes: string[]
+  pipelines: { id: string; label: string | null; stages: { id: string; label: string | null; probability: string | null; closed: boolean }[] }[]
+  suggested_stage_map: Record<string, string>
+  lead_status_map: Record<string, string>
+}
+export interface QualityIssue { key: string; rule: string; fix: string; count: number; severity: 'amber' | 'red' }
+export interface CleanupItem {
+  entity: 'account' | 'prospect' | 'opportunity'; id: string; name: string; account_name: string | null
+  owner_id: string | null; owner_name: string | null; reasons: string[]; hubspot_id: string | null
+}

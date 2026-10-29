@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # header instead of a Google token. Never enable in production.
     dev_auth: bool = False
 
+    # ── HubSpot import (read-only private-app token) ───────────────
+    # HubSpot → Settings → Integrations → Private apps. Server-side only.
+    hubspot_token: str = ""
+    hubspot_base_url: str = "https://api.hubapi.com"
+
     # §5.4 manager escalation threshold (business days overdue).
     escalation_business_days: int = 3
 
