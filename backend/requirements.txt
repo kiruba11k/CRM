@@ -1,0 +1,11 @@
+# LeadStrategus CRM API - same stack as the public backend (FastAPI + asyncpg/Postgres)
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+asyncpg
+loguru
+# Verifies Google Workspace ID tokens at sign-in
+google-auth
+requests

@@ -1,0 +1,23 @@
+# render.yaml - LeadStrategus CRM API (internal).
+# Render → New → Blueprint → this repo (render.yaml at the root).
+services:
+  - type: web
+    name: leadstrategus-crm-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: CRM_DATABASE_URL
+        sync: false   # Neon connection string for the CRM database
+      - key: CRM_FRONTEND_ORIGIN
+        sync: false   # e.g. https://crm.leadstrategus.com
+      - key: CRM_GOOGLE_CLIENT_ID
+        sync: false   # OAuth client of the Internal Google app
+      - key: CRM_ALLOWED_DOMAIN
+        value: leadstrategus.com
+      - key: CRM_ADMIN_EMAILS
+        sync: false
+      - key: CRM_DEV_AUTH
+        value: "false"
