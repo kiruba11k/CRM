@@ -9,7 +9,7 @@ Required *values* are left Optional on purpose: domain.py reports a
 missing name or account in the same plain words as every other rule,
 instead of a generic "Field required".
 """
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal, Optional
 from uuid import UUID
@@ -166,4 +166,40 @@ class NoteIn(_In):
 class UserPatch(_In):
     name: Optional[str] = None
     role: Optional[Literal["salesperson", "manager", "admin"]] = None
+    active: Optional[bool] = None
+
+
+class MeetingIn(_In):
+    entity_type: Optional[Literal["account", "prospect", "opportunity"]] = None
+    entity_id: Optional[UUID] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    starts_at: Optional[datetime] = None
+    duration_minutes: int = 30
+    time_zone: str = "UTC"
+    attendees: list[str] = []
+    add_meet: bool = True
+    reminder_15: bool = True
+    reminder_day: bool = False
+
+
+class MeetingPatch(_In):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    starts_at: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
+    time_zone: Optional[str] = None
+    attendees: Optional[list[str]] = None
+    add_meet: Optional[bool] = None
+    reminder_15: Optional[bool] = None
+    reminder_day: Optional[bool] = None
+
+
+class BookingLinkIn(_In):
+    name: Optional[str] = None
+    url: Optional[str] = None
+
+
+class BookingLinkPatch(_In):
+    name: Optional[str] = None
     active: Optional[bool] = None

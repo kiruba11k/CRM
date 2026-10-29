@@ -118,3 +118,23 @@ export interface CleanupItem {
   entity: 'account' | 'prospect' | 'opportunity'; id: string; name: string; account_name: string | null
   owner_id: string | null; owner_name: string | null; reasons: string[]; hubspot_id: string | null
 }
+
+// Google Calendar sync (backend/app/routers/calendar.py)
+export type SyncState = 'pending' | 'synced' | 'failed' | 'not_connected' | 'cancelled'
+export interface Meeting {
+  id: string; entity_type: 'account' | 'prospect' | 'opportunity' | null; entity_id: string | null; entity_name: string | null
+  owner_id: string; owner_name: string; title: string; description: string | null; starts_at: string; ends_at: string; time_zone: string
+  attendees: string[]; add_meet: boolean; reminder_15: boolean; reminder_day: boolean
+  google_event_id: string | null; html_link: string | null; meet_url: string | null
+  sync_status: SyncState; sync_error: string | null; synced_at: string | null; cancelled: boolean
+}
+export interface CalendarStatus {
+  configured: boolean; missing: string[]; connected: boolean
+  connection: { google_email: string; status: 'connected' | 'needs_reconnect'; connected_at: string; last_sync_at: string | null; last_error: string | null } | null
+}
+export interface CalendarSyncStatus {
+  users: { id: string; name: string; email: string; status: 'connected' | 'needs_reconnect' | null; google_email: string | null
+    last_sync_at: string | null; last_error: string | null; unsynced: number; booking_links: number }[]
+  log: { at: string; action: string; ok: boolean; message: string; meeting_id: string | null; user_name: string | null; meeting_title: string | null }[]
+}
+export interface BookingLink { id: string; owner_id: string; owner_name: string; name: string; url: string; active: boolean; created_at: string }

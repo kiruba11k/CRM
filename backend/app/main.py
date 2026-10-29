@@ -11,7 +11,7 @@ from loguru import logger
 
 from .config import get_settings
 from .db import create_pool, migrate
-from .routers import accounts, actions, admin, hubspot_import, opportunities, prospects, reports
+from .routers import accounts, actions, admin, calendar, hubspot_import, opportunities, prospects, reports
 
 
 @asynccontextmanager
@@ -26,6 +26,9 @@ async def lifespan(app: FastAPI):
     yield
     for task in app.state.import_tasks:
         task.cancel()
+    if getattr(app.state, "google", None) is not None:
+        await app.state.google.aclose()
+        app.state.google = None
     await app.state.pool.close()
 
 
@@ -39,7 +42,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         allow_credentials=False,
     )
-    for r in (accounts, prospects, opportunities, actions, reports, admin, hubspot_import):
+    for r in (accounts, prospects, opportunities, actions, reports, admin, hubspot_import, calendar):
         app.include_router(r.router, prefix="/api")
 
     @app.get("/health", tags=["health"])

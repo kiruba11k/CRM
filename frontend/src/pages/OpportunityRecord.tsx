@@ -7,6 +7,7 @@ import { ApiError, api } from '../api'
 import { money, probabilityOf } from '../format'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
+import { MeetingsCard } from '../components/Meetings'
 import type { Account, AccountDetail, FormValue, FormValues, Issue, OpportunityDetail, Prospect } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, TextField, WarningsBanner, changedFields, useLoad } from '../ui'
 
@@ -225,6 +226,7 @@ export default function OpportunityRecord() {
               <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(primary.email)}`} target="_blank" rel="noreferrer">Compose to {primary.full_name}</a>
             )}
           </section>
+          <MeetingsCard entityType="opportunity" entityId={id} />
           <HistoryCard history={data.history} />
         </div>
       </div>

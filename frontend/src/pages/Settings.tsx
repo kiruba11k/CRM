@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { ApiError, api, downloadCsv } from '../api'
 import { useSession } from '../session'
-import type { Lists, Role, User } from '../types'
+import type { CalendarStatus, Lists, Role, User } from '../types'
 import { Banner, ErrorBanner, Tabs, useLoad } from '../ui'
 
 type Tab = 'lists' | 'reminders' | 'roles' | 'integrations' | 'data' | 'launch'
@@ -181,17 +181,20 @@ function RolesTab() {
   )
 }
 
-const INTEGRATIONS: [string, string, string, 'live' | 'planned' | 'later'][] = [
+const INTEGRATIONS: [string, string, string, keyof typeof INTEG_STATE][] = [
   ['Google sign-in (Workspace)', 'Priority 1', 'Only leadstrategus.com accounts can sign in. The Google app is set to Internal.', 'live'],
   ['Gmail: contextual links', 'Priority 2', 'Search and compose links on accounts, prospects and opportunities. No mail is copied into the CRM.', 'live'],
   ['HubSpot import', 'Pilot', 'Read-only private-app token on the server (CRM_HUBSPOT_TOKEN). Re-runnable; never overwrites records edited in the CRM.', 'live'],
-  ['Google Calendar + Meet', 'Priority 1', 'Create, update and cancel events for meetings and actions. Per-user sign-in, event ID stored to prevent duplicates, sync status and retry shown. Booking links use free/busy.', 'planned'],
+  ['Google Calendar + Meet', 'Priority 1', 'Create, update and cancel meetings in each person’s own calendar with a Meet link. Per-user sign-in, event ID stored to prevent duplicates, sync status and retry shown. Booking links use Google appointment schedules (free/busy).', 'calendar'],
   ['Gmail: thread association', 'Later, if useful', 'Link a specific thread to a record, storing only the thread ID and minimal metadata.', 'later'],
   ['Google Tasks', 'Optional', 'Mirror next actions into Google Tasks. Deferred unless it proves worth the extra sign-in work.', 'later'],
 ]
-const INTEG_STATE = { live: ['Live', 'teal'], planned: ['Next: Phase 4', 'amber'], later: ['Deferred', 'grey'] } as const
+const INTEG_STATE = { live: ['Live', 'teal'], planned: ['Planned', 'amber'], later: ['Deferred', 'grey'], calendar: ['', ''] } as const
 
 function IntegrationsTab() {
+  const calendar = useLoad(() => api<CalendarStatus>('/calendar/status'), [])
+  const pill = (state: keyof typeof INTEG_STATE): [string, string] => state !== 'calendar' ? [INTEG_STATE[state][0], INTEG_STATE[state][1]]
+    : !calendar.data ? ['…', 'grey'] : calendar.data.configured ? ['Live', 'teal'] : [`Needs server setup: ${calendar.data.missing.join(', ')}`, 'amber']
   return (
     <section className="card" aria-label="Google integrations">
       <h2>Google Workspace integrations</h2>
@@ -199,7 +202,7 @@ function IntegrationsTab() {
         {INTEGRATIONS.map(([name, priority, desc, state]) => (
           <div className="list-row" key={name}>
             <span style={{ flex: '1 1 320px' }}><strong>{name}</strong> <span className="muted small">· {priority}</span><br /><span className="muted small">{desc}</span></span>
-            <span className={`pill pill-${INTEG_STATE[state][1]}`}>{INTEG_STATE[state][0]}</span>
+            <span className={`pill pill-${pill(state)[1]}`}>{pill(state)[0]}</span>
           </div>
         ))}
       </div>

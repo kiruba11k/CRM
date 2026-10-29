@@ -28,6 +28,12 @@ services:
         sync: false   # comma-separated; become admins on first sign-in
       - key: CRM_DEV_AUTH
         value: "false"
+      - key: CRM_GOOGLE_CLIENT_SECRET
+        sync: false   # secret of the same Web OAuth client (Calendar sync)
+      - key: CRM_PUBLIC_API_URL
+        sync: false   # this API's URL, e.g. https://leadstrategus-crm-api.onrender.com
+      - key: CRM_TOKEN_KEY
+        generateValue: true   # encrypts stored Google refresh tokens; keep it stable
       - key: CRM_HUBSPOT_TOKEN
         sync: false   # HubSpot private app (read-only scopes); only needed for the import
 

@@ -31,6 +31,17 @@ class Settings(BaseSettings):
     # header instead of a Google token. Never enable in production.
     dev_auth: bool = False
 
+    # ── Google Calendar + Meet sync (§6) ───────────────────────────
+    # Secret of the same Web OAuth client as google_client_id. Add
+    # {public_api_url}/api/calendar/oauth/callback as an authorised
+    # redirect URI on that client, and enable the Google Calendar API.
+    google_client_secret: str = ""
+    # Public URL of this API (e.g. https://leadstrategus-crm-api.onrender.com).
+    public_api_url: str = ""
+    # Any long random string; encrypts stored Google refresh tokens and
+    # signs the OAuth state. Changing it means everyone reconnects.
+    token_key: str = ""
+
     # ── HubSpot import (read-only private-app token) ───────────────
     # HubSpot → Settings → Integrations → Private apps. Server-side only.
     hubspot_token: str = ""
@@ -42,6 +53,20 @@ class Settings(BaseSettings):
     @property
     def admin_email_set(self) -> set[str]:
         return {e.strip().lower() for e in self.admin_emails.split(",") if e.strip()}
+
+    @property
+    def calendar_missing(self) -> list[str]:
+        need = {"CRM_GOOGLE_CLIENT_ID": self.google_client_id, "CRM_GOOGLE_CLIENT_SECRET": self.google_client_secret,
+                "CRM_PUBLIC_API_URL": self.public_api_url, "CRM_TOKEN_KEY": self.token_key}
+        return [k for k, v in need.items() if not v]
+
+    @property
+    def calendar_redirect_uri(self) -> str:
+        return self.public_api_url.rstrip("/") + "/api/calendar/oauth/callback"
+
+    @property
+    def app_url(self) -> str:
+        return (self.cors_origins or ["http://localhost:5174"])[0].rstrip("/")
 
     @property
     def cors_origins(self) -> list[str]:

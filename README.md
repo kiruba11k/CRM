@@ -20,7 +20,7 @@ integration. Staff only (Google Workspace sign-in).
 | 2 | Frontend: My Actions, Prospects, Pipeline, Opportunity/Prospect/Account records, quick create, saved views | **Done** (`frontend/`) |
 | 2b | Frontend: Reports & metrics, Settings (lists, reminders, users & roles, integrations, export & backup, launch checklist), Meetings & booking links, Import from HubSpot | **Done**: Reports, users & roles, CSV export live; Meetings opens a pre-filled Google Calendar event and logs it |
 | 3 | HubSpot import: owners, companies, contacts, deals, associations, notes/calls/meetings/tasks, logged emails; re-runnable; Needs cleanup queue | **Done** (`backend/app/importer.py`) |
-| 4 | Google Calendar + Meet API sync, shared booking links | Planned (Gmail links and Calendar hand-off done) |
+| 4 | Google Calendar + Meet sync per user (create, update, cancel, retry, sync log), shared booking links, Gmail links | **Done** (`backend/app/google_calendar.py`, `routers/calendar.py`) |
 | 5 | Editable controlled lists, reminder toggles, shared launch checklist | Planned (Reports done) |
 
 ## Layout
@@ -30,9 +30,10 @@ backend/
   app/domain.py        spec rules: lists, stages, validation, follow-up logic (no I/O)
   app/migrations/      plain SQL, applied in order on startup
   app/auth.py          Google ID-token sign-in (Workspace domain only) + role checks
-  app/routers/         accounts, prospects, opportunities, actions, reports, admin, hubspot_import
+  app/routers/         accounts, prospects, opportunities, actions, reports, admin, hubspot_import, calendar
   app/hubspot.py       read-only HubSpot CRM v3 client (paging, 429 retry)
   app/importer.py      HubSpot → CRM mapping and the import run
+  app/google_calendar.py  per-user Google OAuth + Calendar events (encrypted refresh tokens)
   scripts/seed_demo.py sample data for a local dev database
   tests/               rule tests (no DB) + API tests (real Postgres)
 frontend/
@@ -95,7 +96,40 @@ frontend (`.github/workflows/frontend-checks.yml`).
 | §8.1 roles (proposed: confirm) | `auth.py`: salesperson edits own records; manager/admin edit all; admin manages users |
 | §8.3 history & audit | `record_history` table, history panel on every record, `GET /api/export/history.csv` |
 | Currencies never summed | every total is keyed by currency |
+| §6 Calendar + Meet: event ID stored, no duplicates, failures visible + retry | `routers/calendar.py` (`sync_meeting`), `meetings` + `calendar_sync_log` tables, Meetings page |
 | HubSpot import | `app/importer.py`, `/api/import/hubspot/*`, Import page; rule-breaking records listed at `/api/import/cleanup` (Needs cleanup page) |
+
+## Google Calendar + Meet sync
+
+Each person connects their own calendar from **Meetings & booking**. A
+meeting scheduled in the CRM is saved first (and logged on the linked
+prospect or opportunity), then created in the owner's Google Calendar with
+a Meet link and invites. The Google event ID is stored, so editing or
+cancelling the meeting changes that same event; a create that is retried
+after a lost reply finds the event instead of adding a second one. Every
+attempt is in the sync log; failures stay on the meeting with **Retry
+sync**. Meetings saved before someone connects are pushed when they do.
+
+Setup, in the same Google Cloud project as sign-in (no cost: the Calendar
+API is free within its usage quotas):
+
+1. **APIs & Services → Library:** enable **Google Calendar API**.
+2. **OAuth consent screen:** user type **Internal**; add the scope
+   `.../auth/calendar.events`.
+3. **Credentials →** the existing *Web* OAuth client: add
+   `https://<your-api>.onrender.com/api/calendar/oauth/callback` under
+   *Authorised redirect URIs*, and copy the client secret.
+4. **Render (API service):** set `CRM_GOOGLE_CLIENT_SECRET` and
+   `CRM_PUBLIC_API_URL` (the API's own URL). `CRM_TOKEN_KEY` is generated
+   by the blueprint; it encrypts stored refresh tokens, so keep it stable
+   (changing it means everyone reconnects).
+
+Until these are set, the Meetings page still works: it opens a pre-filled
+Google Calendar event and logs the meeting on the record.
+
+Booking links are Google Calendar **appointment schedules** (Google runs
+the booking page, free/busy check and invites); the CRM keeps a shared,
+team-wide list of them.
 
 ## HubSpot import
 

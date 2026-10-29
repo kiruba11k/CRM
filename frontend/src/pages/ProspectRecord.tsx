@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
+import { MeetingsCard } from '../components/Meetings'
 import type { Account, FormValue, FormValues, Issue, Opportunity, ProspectDetail } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, changedFields, compact, str, useLoad } from '../ui'
 
@@ -153,6 +154,7 @@ export default function ProspectRecord() {
               <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(data.email)}`} target="_blank" rel="noreferrer">Compose an email</a>
             </section>
           )}
+          <MeetingsCard entityType="prospect" entityId={id} />
           <HistoryCard history={data.history} />
         </div>
       </div>

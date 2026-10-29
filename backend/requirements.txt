@@ -11,3 +11,5 @@ google-auth
 requests
 # HubSpot import (read-only CRM API)
 httpx
+# Encrypts stored Google Calendar refresh tokens
+cryptography
