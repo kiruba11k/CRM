@@ -1,36 +1,38 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
-import { DEV_USER } from './api.js'
-import { useSession } from './session.jsx'
-import { Banner } from './ui.jsx'
-import QuickCreate from './components/QuickCreate.jsx'
-import MyActions from './pages/MyActions.jsx'
-import Prospects from './pages/Prospects.jsx'
-import ProspectRecord from './pages/ProspectRecord.jsx'
-import Pipeline from './pages/Pipeline.jsx'
-import OpportunityRecord from './pages/OpportunityRecord.jsx'
-import Accounts from './pages/Accounts.jsx'
-import AccountRecord from './pages/AccountRecord.jsx'
-import Views from './pages/Views.jsx'
+import { DEV_USER } from './api'
+import { useSessionState } from './session'
+import { Banner } from './ui'
+import QuickCreate, { type QuickType } from './components/QuickCreate'
+import MyActions from './pages/MyActions'
+import Prospects from './pages/Prospects'
+import ProspectRecord from './pages/ProspectRecord'
+import Pipeline from './pages/Pipeline'
+import OpportunityRecord from './pages/OpportunityRecord'
+import Accounts from './pages/Accounts'
+import AccountRecord from './pages/AccountRecord'
+import Views from './pages/Views'
 
-const NAV = [
+const NAV: [string, [string, string][]][] = [
   ['Daily work', [['/', 'My Actions'], ['/prospects', 'Prospects'], ['/pipeline', 'Pipeline'], ['/accounts', 'Accounts']]],
   ['Views & reporting', [['/views', 'Forecast & views']]],
 ]
 
 function Login() {
-  const { signIn, error } = useSession()
-  const btn = useRef(null)
+  const { signIn, error } = useSessionState()
+  const btn = useRef<HTMLDivElement>(null)
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
   const [gsiError, setGsiError] = useState('')
 
   useEffect(() => {
     if (!clientId) return
     const init = () => {
-      window.google.accounts.id.initialize({ client_id: clientId, callback: (r) => signIn(r.credential), auto_select: true })
-      window.google.accounts.id.renderButton(btn.current, { theme: 'outline', size: 'large', text: 'signin_with' })
+      const gid = window.google?.accounts.id
+      if (!gid || !btn.current) return
+      gid.initialize({ client_id: clientId, callback: (r) => signIn(r.credential), auto_select: true })
+      gid.renderButton(btn.current, { theme: 'outline', size: 'large', text: 'signin_with' })
     }
-    if (window.google?.accounts?.id) return init()
+    if (window.google?.accounts.id) { init(); return }
     const s = document.createElement('script')
     s.src = 'https://accounts.google.com/gsi/client'
     s.async = true
@@ -53,12 +55,12 @@ function Login() {
 }
 
 export default function App() {
-  const session = useSession()
-  const [quick, setQuick] = useState(null)
+  const session = useSessionState()
+  const [quick, setQuick] = useState<QuickType | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  if (session.status === 'loading') return <div className="loading">Loading the CRM…</div>
-  if (session.status !== 'ready') return <Login />
+  if (session.status === 'loading') return <div className="loading">Loading the CRM… (the server may take up to a minute to wake up)</div>
+  if (session.status !== 'ready' || !session.user) return <Login />
 
   const { user } = session
   return (
@@ -82,7 +84,7 @@ export default function App() {
         <div className="topbar">
           <span className="muted small">Every active prospect and open opportunity needs an owner, a next action and a due date.</span>
           <div className="row">
-            {['account', 'prospect', 'opportunity'].map((t) => (
+            {(['account', 'prospect', 'opportunity'] as const).map((t) => (
               <button key={t} type="button" className="btn btn-outline" onClick={() => setQuick(t)}>+ {t[0].toUpperCase() + t.slice(1)}</button>
             ))}
           </div>

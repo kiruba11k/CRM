@@ -1,30 +1,30 @@
 // Prospect / contact record (§2.2) with conversion to an opportunity.
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api } from '../api.js'
-import { useCanEdit, useSession } from '../session.jsx'
-import { ActivityCard, HistoryCard } from '../components/Timeline.jsx'
-import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, useLoad } from '../ui.jsx'
+import { ApiError, api } from '../api'
+import { useCanEdit, useSession } from '../session'
+import { ActivityCard, HistoryCard } from '../components/Timeline'
+import type { Account, FormValue, FormValues, Issue, Opportunity, ProspectDetail } from '../types'
+import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, changedFields, compact, str, useLoad } from '../ui'
 
-const EDITABLE = ['full_name', 'account_id', 'job_title', 'email', 'phone', 'linkedin_url', 'owner_id', 'status', 'disqualified_reason', 'source', 'next_action_code', 'next_action_other', 'next_action_due', 'notes']
+const EDITABLE = ['full_name', 'account_id', 'job_title', 'email', 'phone', 'linkedin_url', 'owner_id', 'status', 'disqualified_reason', 'source', 'next_action_code', 'next_action_other', 'next_action_due', 'notes'] as const
 
-function ConvertPanel({ prospect, accounts, onCancel }) {
+function ConvertPanel({ prospect, accountName, accounts, onCancel }: { prospect: ProspectDetail; accountName?: string; accounts: Account[]; onCancel: () => void }) {
   const { lists } = useSession()
   const navigate = useNavigate()
-  const [form, setForm] = useState({
-    name: `${prospect.account_name || ''} · `.replace(/^ · $/, ''), account_id: prospect.account_id, owner_id: prospect.owner_id,
+  const [form, setForm] = useState<FormValues>({
+    name: accountName ? `${accountName} · ` : '', account_id: prospect.account_id, owner_id: prospect.owner_id,
     stage: 'Qualified', currency: 'USD', risk_rating: 'Unassessed',
   })
-  const [error, setError] = useState(null)
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const [error, setError] = useState<ApiError | null>(null)
+  const set = (k: string, v: FormValue) => setForm((f) => ({ ...f, [k]: v }))
   const errors = error?.fieldErrors || {}
   async function save() {
     setError(null)
     try {
-      const body = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '' && v !== null))
-      const opp = await api(`/prospects/${prospect.id}/convert`, { method: 'POST', body })
+      const opp = await api<Opportunity>(`/prospects/${prospect.id}/convert`, { method: 'POST', body: compact(form) })
       navigate(`/opportunities/${opp.id}`)
-    } catch (e) { setError(e) }
+    } catch (e) { setError(e as ApiError) }
   }
   return (
     <section className="card strong" aria-label="Create opportunity">
@@ -58,34 +58,36 @@ function ConvertPanel({ prospect, accounts, onCancel }) {
 }
 
 export default function ProspectRecord() {
-  const { id } = useParams()
+  const { id = '' } = useParams()
   const { lists } = useSession()
-  const { data, error: loadError, reload } = useLoad(() => api(`/prospects/${id}`), [id])
-  const accounts = useLoad(() => api('/accounts'), [])
-  const [form, setForm] = useState(null)
-  const [error, setError] = useState(null)
-  const [saved, setSaved] = useState(null)
+  const { data, error: loadError, reload } = useLoad(() => api<ProspectDetail>(`/prospects/${id}`), [id])
+  const accounts = useLoad(() => api<Account[]>('/accounts'), [])
+  const [form, setForm] = useState<FormValues | null>(null)
+  const [error, setError] = useState<ApiError | null>(null)
+  const [saved, setSaved] = useState<Issue[] | null>(null)
   const [converting, setConverting] = useState(false)
   const canEdit = useCanEdit(data?.owner_id)
 
-  useEffect(() => { if (data) setForm(Object.fromEntries(EDITABLE.map((k) => [k, data[k] ?? null]))) }, [data])
+  useEffect(() => {
+    if (data) setForm(Object.fromEntries(EDITABLE.map((k) => [k, data[k] ?? null])))
+  }, [data])
   if (loadError) return <ErrorBanner error={loadError} />
   if (!data || !form) return <div className="loading">Loading…</div>
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const set = (k: string, v: FormValue) => setForm((f) => ({ ...(f as FormValues), [k]: v }))
   const errors = error?.fieldErrors || {}
   const closed = form.status === 'Disqualified'
   const accountName = accounts.data?.find((a) => a.id === data.account_id)?.name
 
   async function save() {
+    if (!form || !data) return
     setError(null)
     setSaved(null)
-    const patch = Object.fromEntries(EDITABLE.filter((k) => (form[k] ?? null) !== (data[k] ?? null)).map((k) => [k, form[k] === '' ? null : form[k]]))
     try {
-      const res = await api(`/prospects/${id}`, { method: 'PATCH', body: patch })
+      const res = await api<{ warnings?: Issue[] }>(`/prospects/${id}`, { method: 'PATCH', body: changedFields(form, data, EDITABLE) })
       setSaved(res.warnings || [])
-      reload()
-    } catch (e) { setError(e) }
+      void reload()
+    } catch (e) { setError(e as ApiError) }
   }
 
   return (
@@ -104,8 +106,8 @@ export default function ProspectRecord() {
       {!canEdit && <Banner kind="warn">You can view this prospect. Only its owner, a manager or an admin can edit it.</Banner>}
       <ErrorBanner error={error} onClose={() => setError(null)} />
       {saved && <Banner onClose={() => setSaved(null)}>Saved.</Banner>}
-      <WarningsBanner warnings={saved || []} />
-      {converting && <ConvertPanel prospect={{ ...data, account_name: accountName }} accounts={accounts.data || []} onCancel={() => setConverting(false)} />}
+      <WarningsBanner warnings={saved} />
+      {converting && <ConvertPanel prospect={data} accountName={accountName} accounts={accounts.data || []} onCancel={() => setConverting(false)} />}
       <div className="cols">
         <div className="col-main">
           <section className="card strong" aria-label="Next action">
@@ -131,7 +133,7 @@ export default function ProspectRecord() {
             </div>
             <TextField label="Notes" multiline value={form.notes} onChange={(v) => set('notes', v)} />
           </section>
-          <ActivityCard activities={data.activities} postUrl={`/prospects/${id}/activities`} onAdded={reload} />
+          <ActivityCard activities={data.activities} postUrl={`/prospects/${id}/activities`} onAdded={() => void reload()} />
         </div>
         <div className="col-side">
           <section className="card" aria-label="Opportunities">
@@ -147,7 +149,7 @@ export default function ProspectRecord() {
           {data.email && (
             <section className="card" aria-label="Gmail">
               <h2>Gmail</h2>
-              <a href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(data.email)}`} target="_blank" rel="noreferrer">Search Gmail for {data.email}</a>
+              <a href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(data.email)}`} target="_blank" rel="noreferrer">Search Gmail for {str(data.email)}</a>
               <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(data.email)}`} target="_blank" rel="noreferrer">Compose an email</a>
             </section>
           )}

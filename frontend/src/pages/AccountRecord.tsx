@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api } from '../api.js'
-import { fmtDate, money, moneyByCurrency, nextActionLabel } from '../format.js'
-import { useCanEdit, useSession } from '../session.jsx'
-import { ActivityCard, HistoryCard } from '../components/Timeline.jsx'
-import { Banner, ErrorBanner, OwnerField, SelectField, StatusPill, Tabs, TextField, useLoad } from '../ui.jsx'
+import { ApiError, api } from '../api'
+import { fmtDate, money, moneyByCurrency, nextActionLabel, totalsByCurrency } from '../format'
+import { useCanEdit, useSession } from '../session'
+import { ActivityCard, HistoryCard } from '../components/Timeline'
+import type { AccountDetail, FormValue, FormValues } from '../types'
+import { Banner, ErrorBanner, OwnerField, SelectField, StatusPill, Tabs, TextField, changedFields, useLoad } from '../ui'
 
-const EDITABLE = ['name', 'country', 'region', 'industry', 'owner_id', 'status', 'website', 'linkedin_url', 'notes']
+const EDITABLE = ['name', 'country', 'region', 'industry', 'owner_id', 'status', 'website', 'linkedin_url', 'notes'] as const
+type Tab = 'opps' | 'people' | 'activity'
 
 export default function AccountRecord() {
-  const { id } = useParams()
+  const { id = '' } = useParams()
   const { lists } = useSession()
-  const { data, error: loadError, reload } = useLoad(() => api(`/accounts/${id}`), [id])
-  const [form, setForm] = useState(null)
-  const [tab, setTab] = useState('opps')
-  const [error, setError] = useState(null)
+  const { data, error: loadError, reload } = useLoad(() => api<AccountDetail>(`/accounts/${id}`), [id])
+  const [form, setForm] = useState<FormValues | null>(null)
+  const [tab, setTab] = useState<Tab>('opps')
+  const [error, setError] = useState<ApiError | null>(null)
   const [saved, setSaved] = useState(false)
   const canEdit = useCanEdit(data?.owner_id)
 
@@ -22,25 +24,22 @@ export default function AccountRecord() {
   if (loadError) return <ErrorBanner error={loadError} />
   if (!data || !form) return <div className="loading">Loading…</div>
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const set = (k: string, v: FormValue) => setForm((f) => ({ ...(f as FormValues), [k]: v }))
   const errors = error?.fieldErrors || {}
   const open = data.opportunities.filter((o) => !['Won', 'Lost'].includes(o.stage) && !o.on_nurture)
-  const wonTotals = {}
-  const openTotals = {}
-  for (const o of data.opportunities) {
-    if (o.stage === 'Won') wonTotals[o.currency] = (wonTotals[o.currency] || 0) + Number(o.actual_value || 0)
-  }
-  for (const o of open) openTotals[o.currency] = (openTotals[o.currency] || 0) + Number(o.estimated_value || 0)
+  const openTotals = totalsByCurrency(open, (o) => o.estimated_value)
+  const wonTotals = totalsByCurrency(data.opportunities.filter((o) => o.stage === 'Won'), (o) => o.actual_value)
+  const existingId = error?.extra?.existing_id as string | undefined
 
   async function save() {
+    if (!form || !data) return
     setError(null)
     setSaved(false)
-    const patch = Object.fromEntries(EDITABLE.filter((k) => (form[k] ?? null) !== (data[k] ?? null)).map((k) => [k, form[k] === '' ? null : form[k]]))
     try {
-      await api(`/accounts/${id}`, { method: 'PATCH', body: patch })
+      await api(`/accounts/${id}`, { method: 'PATCH', body: changedFields(form, data, EDITABLE) })
       setSaved(true)
-      reload()
-    } catch (e) { setError(e) }
+      void reload()
+    } catch (e) { setError(e as ApiError) }
   }
 
   return (
@@ -51,7 +50,7 @@ export default function AccountRecord() {
         {canEdit && <button type="button" className="btn btn-primary" onClick={save}>Save</button>}
       </div>
       <ErrorBanner error={error} onClose={() => setError(null)} />
-      {error?.extra?.existing_id && <Banner kind="warn">That name is taken: <Link to={`/accounts/${error.extra.existing_id}`}>open the existing account</Link>.</Banner>}
+      {existingId && <Banner kind="warn">That name is taken: <Link to={`/accounts/${existingId}`}>open the existing account</Link>.</Banner>}
       {saved && <Banner onClose={() => setSaved(false)}>Saved.</Banner>}
       <section className="tiles" aria-label="Account summary">
         <div className="tile"><span className="k">Open pipeline</span><span className="v" style={{ fontSize: 18 }}>{moneyByCurrency(openTotals)}</span><span className="s">{open.length} open, non-nurtured</span></div>
@@ -60,7 +59,7 @@ export default function AccountRecord() {
       </section>
       <div className="cols">
         <div className="col-main">
-          <Tabs label="Related records" value={tab} onChange={setTab} tabs={[
+          <Tabs<Tab> label="Related records" value={tab} onChange={setTab} tabs={[
             { value: 'opps', label: 'Opportunities', count: data.opportunities.length },
             { value: 'people', label: 'Prospects / contacts', count: data.prospects.length },
             { value: 'activity', label: 'Activity' },

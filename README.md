@@ -5,7 +5,12 @@ Accounts, Prospects/Contacts, Opportunities and Next Actions, with
 disciplined follow-up, risk and nurture rules, and Google Workspace
 integration. Staff only (Google Workspace sign-in).
 
-Stack: FastAPI + asyncpg on Postgres (Neon) for the API, React + Vite for the frontend.
+| Layer | Stack |
+|---|---|
+| Backend | FastAPI (Python 3.12) + asyncpg |
+| Frontend | TypeScript + React, built with Node.js 20 and Vite |
+| Database | Neon (serverless PostgreSQL) |
+| Hosting | Render free tier: API as a free web service, frontend as a free static site |
 
 ## Status
 
@@ -28,9 +33,10 @@ backend/
   scripts/seed_demo.py sample data for a local dev database
   tests/               rule tests (no DB) + API tests (real Postgres)
 frontend/
-  src/pages/           My Actions, Prospects, Pipeline, records, views
+  src/types.ts         TypeScript types for every API response
+  src/pages/           My Actions, Prospects, Pipeline, records, views (.tsx)
   src/components/      quick create, activity timeline + history
-render.yaml            Render blueprint for the API
+render.yaml            Render blueprint: API + static site, both on the free plan
 ```
 
 ## Run locally
@@ -51,6 +57,7 @@ cd ../frontend
 npm install
 echo "VITE_DEV_USER=you@leadstrategus.com" > .env.local   # local only, with CRM_DEV_AUTH=true
 npm run dev
+npm run typecheck   # tsc --noEmit (also part of npm run build)
 ```
 
 API docs: http://localhost:8100/docs. In production the frontend uses Google
@@ -68,7 +75,8 @@ CRM_TEST_DATABASE_URL=postgresql://USER:PASS@localhost/crm_test pytest
 
 The test database's `public` schema is dropped and recreated. Without
 `CRM_TEST_DATABASE_URL` only the pure rule tests run. CI runs both
-(`.github/workflows/backend-tests.yml`).
+(`.github/workflows/backend-tests.yml`), and type-checks and builds the
+frontend (`.github/workflows/frontend-checks.yml`).
 
 ## How the spec maps to the code
 
@@ -85,10 +93,34 @@ The test database's `public` schema is dropped and recreated. Without
 | §8.3 history & audit | `record_history` table, history panel on every record, `GET /api/export/history.csv` |
 | Currencies never summed | every total is keyed by currency |
 
-## Deploy (Render)
+## Deploy: Render (free) + Neon (free)
 
-`render.yaml` defines the API service: **New → Blueprint**, pick this repo,
-then set the environment values from `backend/.env.example`. The frontend
-is a static site: build command `npm install && npm run build`, publish
-directory `frontend/dist`, with `VITE_API_URL` and `VITE_GOOGLE_CLIENT_ID` set
-and a rewrite of `/*` to `/index.html` for client-side routes.
+1. **Neon:** create a project at console.neon.tech, then **Connect** → copy
+   the connection string. The direct one (host without `-pooler`) is
+   recommended; the pooled one also works. Tables are created automatically
+   on the API's first start.
+2. **Google:** in Google Cloud, create an OAuth client (type *Web*) for an app
+   with user type **Internal**. Add the static site's URL to *Authorised
+   JavaScript origins*.
+3. **Render:** **New → Blueprint** → pick this repo. `render.yaml` creates:
+   - `leadstrategus-crm-api` (FastAPI, free web service). Set
+     `CRM_DATABASE_URL`, `CRM_GOOGLE_CLIENT_ID`, `CRM_ADMIN_EMAILS` and
+     `CRM_FRONTEND_ORIGIN` (the static site's URL).
+   - `leadstrategus-crm` (React + TypeScript, free static site). Set
+     `VITE_API_URL` (the API's URL) and `VITE_GOOGLE_CLIENT_ID`.
+   Because the two URLs reference each other, deploy once, copy each
+   service's `onrender.com` URL into the other's variable, then redeploy.
+   `CRM_DEV_AUTH` must stay `false`.
+
+**Free-tier behaviour to expect**
+
+- The API **sleeps after ~15 minutes without traffic**. The first request
+  after that takes up to about a minute while it wakes; the frontend waits
+  up to 90 seconds and shows a "waking up" message instead of failing.
+  The static site itself never sleeps.
+- Free web services get 750 instance hours a month per workspace, enough
+  for one service running all month. Moving the API to Render's smallest
+  paid instance removes the sleep.
+- Neon's free plan also suspends an idle database and resumes it on the
+  next query (usually within a second or two). The API recycles idle
+  connections so a resumed database is picked up cleanly.

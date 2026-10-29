@@ -1,19 +1,20 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, downloadCsv } from '../api.js'
-import { useSession } from '../session.jsx'
-import { ErrorBanner, SelectField, Tabs, TextField, useLoad } from '../ui.jsx'
+import { ApiError, api, downloadCsv } from '../api'
+import { useSession } from '../session'
+import type { Account } from '../types'
+import { ErrorBanner, SelectField, Tabs, TextField, useLoad } from '../ui'
 
-const STATUS_PILL = { Target: 'blue', 'Active customer': 'teal', 'Inactive / do not pursue': 'paper' }
+const STATUS_PILL: Record<string, string> = { Target: 'blue', 'Active customer': 'teal', 'Inactive / do not pursue': 'paper' }
 
 export default function Accounts() {
   const { lists } = useSession()
   const [status, setStatus] = useState('all')
-  const [country, setCountry] = useState(null)
+  const [country, setCountry] = useState<string | null>(null)
   const [q, setQ] = useState('')
-  const [exportError, setExportError] = useState(null)
-  const { data, error, loading } = useLoad(() => api('/accounts'), [])
-  const rows = data || []
+  const [exportError, setExportError] = useState<ApiError | null>(null)
+  const { data, error, loading } = useLoad(() => api<Account[]>('/accounts'), [])
+  const rows = useMemo(() => data || [], [data])
   const filtered = useMemo(() => rows.filter((a) => (status === 'all' || a.status === status) && (!country || a.country === country)
     && (!q || `${a.name} ${a.industry || ''}`.toLowerCase().includes(q.toLowerCase()))), [rows, status, country, q])
   const countries = [...new Set(rows.map((a) => a.country))].sort()
@@ -25,7 +26,7 @@ export default function Accounts() {
           <h1>Accounts</h1>
           <p>One record per company. Each account can have many prospects and many opportunities.</p>
         </div>
-        <button type="button" className="btn" onClick={() => downloadCsv('accounts').catch(setExportError)}>Export CSV</button>
+        <button type="button" className="btn" onClick={() => downloadCsv('accounts').catch((e: ApiError) => setExportError(e))}>Export CSV</button>
       </div>
       <ErrorBanner error={exportError} onClose={() => setExportError(null)} />
       <Tabs label="Account status" value={status} onChange={setStatus}

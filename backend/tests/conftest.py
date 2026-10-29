@@ -12,7 +12,10 @@ import os
 import asyncpg
 import pytest
 
+from app.db import normalise_dsn
+
 TEST_DB = os.environ.get("CRM_TEST_DATABASE_URL", "")
+RAW_DB = normalise_dsn(TEST_DB) if TEST_DB else ""
 ADMIN = "admin@leadstrategus.com"
 MANAGER = "manager@leadstrategus.com"
 REP = "rep@leadstrategus.com"
@@ -24,7 +27,7 @@ def _run(coro):
 
 
 async def _reset_schema():
-    con = await asyncpg.connect(TEST_DB)
+    con = await asyncpg.connect(RAW_DB)
     try:
         await con.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
     finally:
@@ -32,7 +35,7 @@ async def _reset_schema():
 
 
 async def _truncate():
-    con = await asyncpg.connect(TEST_DB)
+    con = await asyncpg.connect(RAW_DB)
     try:
         await con.execute(
             "TRUNCATE record_history, activities, opportunity_team, opportunities, prospects, accounts, users RESTART IDENTITY CASCADE"
@@ -69,7 +72,7 @@ def client(app):
 
 def _tables_exist() -> bool:
     async def check():
-        con = await asyncpg.connect(TEST_DB)
+        con = await asyncpg.connect(RAW_DB)
         try:
             return await con.fetchval("SELECT to_regclass('public.users') IS NOT NULL")
         finally:

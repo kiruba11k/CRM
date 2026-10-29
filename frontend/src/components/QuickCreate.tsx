@@ -1,25 +1,34 @@
-// §8.2 quick-create with minimal mandatory fields; optional ones under "More details".
-import { useEffect, useState } from 'react'
+// §8.2 quick-create with minimal mandatory fields; the rest go on the record.
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { api } from '../api.js'
-import { useSession } from '../session.jsx'
-import { ErrorBanner, NextActionFields, OwnerField, SelectField, Tabs, TextField, useLoad } from '../ui.jsx'
+import { ApiError, api } from '../api'
+import { useSession } from '../session'
+import type { Account, FieldErrors, FormValue, FormValues } from '../types'
+import { ErrorBanner, NextActionFields, OwnerField, SelectField, Tabs, TextField, compact, str, useLoad } from '../ui'
+
+export type QuickType = 'account' | 'prospect' | 'opportunity'
 
 const COUNTRIES = ['Australia', 'France', 'Germany', 'India', 'Italy', 'Portugal', 'South Korea', 'Sweden', 'UAE', 'United Kingdom', 'United States']
 
-function useAccounts() {
-  return useLoad(() => api('/accounts'), [])
+interface FormProps {
+  form: FormValues
+  set: (k: string, v: FormValue) => void
+  setForm: (f: FormValues) => void
+  errors: FieldErrors
+  accounts: Account[]
 }
 
-function AccountForm({ form, set, errors }) {
+function AccountForm({ form, set, errors }: FormProps) {
   const { lists } = useSession()
-  const [dupes, setDupes] = useState([])
+  const [dupes, setDupes] = useState<Pick<Account, 'id' | 'name' | 'country'>[]>([])
+  const name = str(form.name).trim()
   useEffect(() => {
-    const name = (form.name || '').trim()
     if (name.length < 3) { setDupes([]); return }
-    const t = setTimeout(() => api('/accounts/duplicates', { params: { name } }).then(setDupes).catch(() => setDupes([])), 300)
+    const t = setTimeout(() => {
+      api<Pick<Account, 'id' | 'name' | 'country'>[]>('/accounts/duplicates', { params: { name } }).then(setDupes).catch(() => setDupes([]))
+    }, 300)
     return () => clearTimeout(t)
-  }, [form.name])
+  }, [name])
   return (
     <>
       {dupes.length > 0 && (
@@ -37,13 +46,13 @@ function AccountForm({ form, set, errors }) {
   )
 }
 
-function ProspectForm({ form, set, setForm, errors, accounts }) {
+function ProspectForm({ form, set, setForm, errors, accounts }: FormProps) {
   const { lists } = useSession()
   return (
     <div className="grid-fields">
       <TextField label="Full name" required value={form.full_name} onChange={(v) => set('full_name', v)} error={errors.full_name} />
       <SelectField label="Account" value={form.account_id} onChange={(v) => set('account_id', v)} placeholder="Not known yet"
-        options={(accounts || []).map((a) => ({ value: a.id, label: a.name }))} />
+        options={accounts.map((a) => ({ value: a.id, label: a.name }))} />
       <TextField label="Email" type="email" value={form.email} onChange={(v) => set('email', v)} error={errors.email} hint="At least one contact route is recommended" />
       <OwnerField value={form.owner_id} onChange={(v) => set('owner_id', v)} error={errors.owner_id} />
       <SelectField label="Status" value={form.status} onChange={(v) => set('status', v)} options={lists.prospect_statuses} />
@@ -52,14 +61,14 @@ function ProspectForm({ form, set, setForm, errors, accounts }) {
   )
 }
 
-function OpportunityForm({ form, set, setForm, errors, accounts }) {
+function OpportunityForm({ form, set, setForm, errors, accounts }: FormProps) {
   const { lists } = useSession()
   const qualified = lists.stages.findIndex((s) => s.name === form.stage) >= 1
   return (
     <div className="grid-fields">
       <TextField label="Opportunity name" required value={form.name} onChange={(v) => set('name', v)} error={errors.name} hint="e.g. Norvale · LinkedIn lead generation" />
       <SelectField label="Account" required value={form.account_id} onChange={(v) => set('account_id', v)} placeholder="Choose…" error={errors.account_id}
-        options={(accounts || []).map((a) => ({ value: a.id, label: a.name }))} />
+        options={accounts.map((a) => ({ value: a.id, label: a.name }))} />
       <OwnerField value={form.owner_id} onChange={(v) => set('owner_id', v)} error={errors.owner_id} />
       <SelectField label="Sales stage" required value={form.stage} onChange={(v) => set('stage', v)}
         options={lists.stages.filter((s) => !['Won', 'Lost'].includes(s.name)).map((s) => ({ value: s.name, label: `${s.name} · ${s.probability}%` }))} />
@@ -73,52 +82,51 @@ function OpportunityForm({ form, set, setForm, errors, accounts }) {
   )
 }
 
-const DEFAULTS = {
+const DEFAULTS: Record<QuickType, FormValues> = {
   account: { status: 'Target' },
   prospect: { status: 'New' },
   opportunity: { stage: 'Lead identified', currency: 'USD', risk_rating: 'Unassessed' },
 }
-const ENDPOINT = { account: '/accounts', prospect: '/prospects', opportunity: '/opportunities' }
-const RECORD_PATH = { account: '/accounts/', prospect: '/prospects/', opportunity: '/opportunities/' }
+const ENDPOINT: Record<QuickType, string> = { account: '/accounts', prospect: '/prospects', opportunity: '/opportunities' }
+const RECORD_PATH: Record<QuickType, string> = { account: '/accounts/', prospect: '/prospects/', opportunity: '/opportunities/' }
 
-export default function QuickCreate({ type: initialType, onClose, onCreated }) {
+export default function QuickCreate({ type: initialType, onClose, onCreated }: { type: QuickType; onClose: () => void; onCreated: () => void }) {
   const { user } = useSession()
   const navigate = useNavigate()
-  const [type, setType] = useState(initialType)
-  const [form, setForm] = useState({ ...DEFAULTS[initialType], owner_id: user.id })
-  const [error, setError] = useState(null)
+  const [type, setType] = useState<QuickType>(initialType)
+  const [form, setForm] = useState<FormValues>({ ...DEFAULTS[initialType], owner_id: user.id })
+  const [error, setError] = useState<ApiError | null>(null)
   const [saving, setSaving] = useState(false)
-  const accounts = useAccounts()
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const accounts = useLoad(() => api<Account[]>('/accounts'), [])
+  const set = (k: string, v: FormValue) => setForm((f) => ({ ...f, [k]: v }))
 
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const switchType = (t) => { setType(t); setForm({ ...DEFAULTS[t], owner_id: user.id }); setError(null) }
+  const switchType = (t: QuickType) => { setType(t); setForm({ ...DEFAULTS[t], owner_id: user.id }); setError(null) }
 
-  async function save(e) {
+  async function save(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
     setError(null)
     try {
-      const body = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== '' && v !== null && v !== undefined))
-      const created = await api(ENDPOINT[type], { method: 'POST', body })
+      const created = await api<{ id: string }>(ENDPOINT[type], { method: 'POST', body: compact(form) })
       onCreated()
       onClose()
       navigate(RECORD_PATH[type] + created.id)
     } catch (err) {
-      setError(err)
+      setError(err as ApiError)
     } finally {
       setSaving(false)
     }
   }
 
-  const errors = error?.fieldErrors || {}
+  const props: FormProps = { form, set, setForm, errors: error?.fieldErrors || {}, accounts: accounts.data || [] }
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <form className="modal" role="dialog" aria-modal="true" aria-label="Quick create" onSubmit={save} noValidate>
         <div className="card-head">
           <h2 style={{ fontSize: 18 }}>Quick create</h2>
@@ -127,9 +135,9 @@ export default function QuickCreate({ type: initialType, onClose, onCreated }) {
         <Tabs label="Record type" value={type} onChange={switchType}
           tabs={[{ value: 'account', label: 'Account' }, { value: 'prospect', label: 'Prospect' }, { value: 'opportunity', label: 'Opportunity' }]} />
         <ErrorBanner error={error} />
-        {type === 'account' && <AccountForm form={form} set={set} errors={errors} />}
-        {type === 'prospect' && <ProspectForm form={form} set={set} setForm={setForm} errors={errors} accounts={accounts.data} />}
-        {type === 'opportunity' && <OpportunityForm form={form} set={set} setForm={setForm} errors={errors} accounts={accounts.data} />}
+        {type === 'account' && <AccountForm {...props} />}
+        {type === 'prospect' && <ProspectForm {...props} />}
+        {type === 'opportunity' && <OpportunityForm {...props} />}
         <p className="muted small" style={{ margin: 0 }}>Only the required fields are shown here. Add the rest on the record.</p>
         <div className="row">
           <button type="submit" className="btn btn-dark" disabled={saving}>{saving ? 'Creating…' : `Create ${type}`}</button>

@@ -1,25 +1,29 @@
 // §7 My Prospects: filter by status, geography, source and next action.
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, downloadCsv } from '../api.js'
-import { fmtDate, nextActionLabel, todayIso } from '../format.js'
-import { useSession } from '../session.jsx'
-import { ErrorBanner, SelectField, StatusPill, Tabs, TextField, useLoad } from '../ui.jsx'
+import { ApiError, api, downloadCsv } from '../api'
+import { fmtDate, nextActionLabel, todayIso } from '../format'
+import { useSession } from '../session'
+import type { Prospect } from '../types'
+import { ErrorBanner, SelectField, StatusPill, Tabs, TextField, useLoad } from '../ui'
+
+type Scope = 'mine' | 'all' | 'unlinked'
+interface Filters { status: string | null; country: string | null; source: string | null; next_action: string | null; q: string }
 
 export default function Prospects() {
   const { lists } = useSession()
-  const [scope, setScope] = useState('mine')
-  const [f, setF] = useState({ status: null, country: null, source: null, next_action: null, q: '' })
-  const [exportError, setExportError] = useState(null)
-  const { data, error, loading } = useLoad(() => api('/prospects', { params: { scope } }), [scope])
-  const rows = data || []
+  const [scope, setScope] = useState<Scope>('mine')
+  const [f, setF] = useState<Filters>({ status: null, country: null, source: null, next_action: null, q: '' })
+  const [exportError, setExportError] = useState<ApiError | null>(null)
+  const { data, error, loading } = useLoad(() => api<Prospect[]>('/prospects', { params: { scope } }), [scope])
   const today = todayIso()
 
+  const rows = useMemo(() => data || [], [data])
   const filtered = useMemo(() => rows.filter((p) =>
     (!f.status || p.status === f.status) && (!f.country || p.geography === f.country) && (!f.source || p.source === f.source)
     && (!f.next_action || p.next_action_code === f.next_action)
     && (!f.q || `${p.full_name} ${p.email || ''} ${p.account_name || ''}`.toLowerCase().includes(f.q.toLowerCase()))), [rows, f])
-  const countries = [...new Set(rows.map((p) => p.geography).filter(Boolean))].sort()
+  const countries = [...new Set(rows.map((p) => p.geography).filter((g): g is string => !!g))].sort()
 
   return (
     <>
@@ -28,7 +32,7 @@ export default function Prospects() {
           <h1>Prospects</h1>
           <p>People you may contact or are engaging. A prospect can exist before any opportunity. Create one only when a specific piece of business can be tracked.</p>
         </div>
-        <button type="button" className="btn" onClick={() => downloadCsv('prospects').catch(setExportError)}>Export CSV</button>
+        <button type="button" className="btn" onClick={() => downloadCsv('prospects').catch((e: ApiError) => setExportError(e))}>Export CSV</button>
       </div>
       <ErrorBanner error={exportError} onClose={() => setExportError(null)} />
 
@@ -43,7 +47,7 @@ export default function Prospects() {
         ))}
       </section>
 
-      <Tabs label="Saved views" value={scope} onChange={setScope}
+      <Tabs<Scope> label="Saved views" value={scope} onChange={setScope}
         tabs={[{ value: 'mine', label: 'My prospects' }, { value: 'all', label: 'All prospects' }, { value: 'unlinked', label: 'No account yet' }]} />
 
       <div className="grid-fields" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
@@ -63,7 +67,7 @@ export default function Prospects() {
             <tbody>
               {filtered.map((p) => {
                 const closed = p.status === 'Disqualified'
-                const overdue = !closed && p.next_action_due && p.next_action_due < today
+                const overdue = !closed && !!p.next_action_due && p.next_action_due < today
                 return (
                   <tr key={p.id}>
                     <td><Link to={`/prospects/${p.id}`} style={{ fontWeight: 600 }}>{p.full_name}</Link><div className="sub">{p.job_title}</div></td>

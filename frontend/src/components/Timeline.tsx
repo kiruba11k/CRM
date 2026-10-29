@@ -1,28 +1,30 @@
 // Activity timeline + "log a note/call/meeting" + key-field history.
 import { useState } from 'react'
-import { api } from '../api.js'
-import { fmtDate, fmtDateTime, nextActionLabel, userName } from '../format.js'
-import { useSession } from '../session.jsx'
-import { ErrorBanner, SelectField, TextField } from '../ui.jsx'
+import { ApiError, api } from '../api'
+import { fmtDate, fmtDateTime, nextActionLabel, userName } from '../format'
+import { useSession } from '../session'
+import type { Activity, HistoryEntry, Lists, User } from '../types'
+import { ErrorBanner, SelectField, TextField } from '../ui'
 
-const FIELD_LABEL = {
+const FIELD_LABEL: Record<string, string> = {
   stage: 'Stage', owner_id: 'Owner', estimated_value: 'Estimated value', currency: 'Currency', expected_close: 'Expected close',
   risk_rating: 'Risk rating', on_nurture: 'On nurture', nurture_until: 'Nurture until', next_action_code: 'Next action',
   next_action_due: 'Next action due', actual_value: 'Actual value', lost_reason: 'Lost reason', status: 'Status',
   account_id: 'Account', name: 'Name', country: 'Country',
 }
+type NoteKind = 'note' | 'call' | 'meeting' | 'email'
 
-export function ActivityCard({ activities, postUrl, onAdded }) {
-  const [kind, setKind] = useState('note')
+export function ActivityCard({ activities, postUrl, onAdded }: { activities: Activity[] | undefined; postUrl?: string; onAdded?: () => void }) {
+  const [kind, setKind] = useState<NoteKind>('note')
   const [summary, setSummary] = useState('')
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<ApiError | null>(null)
   async function add() {
-    if (!summary.trim()) return
+    if (!summary.trim() || !postUrl) return
     try {
       await api(postUrl, { method: 'POST', body: { kind, summary } })
       setSummary('')
-      onAdded()
-    } catch (e) { setError(e) }
+      onAdded?.()
+    } catch (e) { setError(e as ApiError) }
   }
   return (
     <section className="card" aria-label="Activity">
@@ -30,7 +32,7 @@ export function ActivityCard({ activities, postUrl, onAdded }) {
       {postUrl && <>
         <ErrorBanner error={error} onClose={() => setError(null)} />
         <div className="grid-fields" style={{ gridTemplateColumns: '140px minmax(0, 1fr)' }}>
-          <SelectField label="Type" value={kind} onChange={(v) => setKind(v || 'note')}
+          <SelectField label="Type" value={kind} onChange={(v) => setKind((v as NoteKind) || 'note')}
             options={[{ value: 'note', label: 'Note' }, { value: 'call', label: 'Call' }, { value: 'meeting', label: 'Meeting' }, { value: 'email', label: 'Email' }]} />
           <TextField label="What happened?" value={summary} onChange={setSummary} />
         </div>
@@ -50,8 +52,8 @@ export function ActivityCard({ activities, postUrl, onAdded }) {
 }
 
 // Show history values the way people read them: names, labels, dates.
-function readable(field, v, lists, users) {
-  if (v === null || v === undefined || v === '') return '—'
+function readable(field: string, v: string | null, lists: Lists, users: User[]): string {
+  if (v === null || v === '') return '—'
   if (field === 'owner_id') return userName(users, v)
   if (field === 'next_action_code') return nextActionLabel(lists, v, '') || v
   if (field === 'on_nurture') return v === 'True' ? 'Yes' : 'No'
@@ -60,7 +62,7 @@ function readable(field, v, lists, users) {
   return v
 }
 
-export function HistoryCard({ history }) {
+export function HistoryCard({ history }: { history: HistoryEntry[] | undefined }) {
   const { lists, users } = useSession()
   return (
     <section className="card" aria-label="History">

@@ -1,23 +1,53 @@
-# render.yaml - LeadStrategus CRM API (internal).
-# Render → New → Blueprint → this repo (render.yaml at the root).
+# render.yaml - LeadStrategus CRM on Render's free tier.
+# Render → New → Blueprint → this repo. Creates two services:
+#   leadstrategus-crm-api  FastAPI (free web service; sleeps after ~15 min idle)
+#   leadstrategus-crm      React + TypeScript build (free static site; never sleeps)
+# The database is Neon (free plan), not Render: paste its connection string
+# into CRM_DATABASE_URL. Values marked sync:false are asked for on first deploy.
 services:
   - type: web
     name: leadstrategus-crm-api
     runtime: python
+    plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
       - key: CRM_DATABASE_URL
-        sync: false   # Neon connection string for the CRM database
+        sync: false   # Neon → Connect → Direct connection string (not the -pooler one)
       - key: CRM_FRONTEND_ORIGIN
-        sync: false   # e.g. https://crm.leadstrategus.com
+        sync: false   # the static site's URL, e.g. https://leadstrategus-crm.onrender.com
       - key: CRM_GOOGLE_CLIENT_ID
-        sync: false   # OAuth client of the Internal Google app
+        sync: false   # OAuth client of the Internal Google Cloud app
       - key: CRM_ALLOWED_DOMAIN
         value: leadstrategus.com
       - key: CRM_ADMIN_EMAILS
-        sync: false
+        sync: false   # comma-separated; become admins on first sign-in
       - key: CRM_DEV_AUTH
         value: "false"
+
+  - type: web
+    name: leadstrategus-crm
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: VITE_API_URL
+        sync: false   # the API's URL, e.g. https://leadstrategus-crm-api.onrender.com
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false   # same Client ID as CRM_GOOGLE_CLIENT_ID
+    headers:
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex, nofollow
+    routes:
+      # Client-side routes (/pipeline, /opportunities/…) all load index.html.
+      - type: rewrite
+        source: /*
+        destination: /index.html
