@@ -6,7 +6,7 @@ import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import { MeetingsCard } from '../components/Meetings'
 import type { Account, FormValue, FormValues, Issue, Opportunity, ProspectDetail } from '../types'
-import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, changedFields, compact, str, useLoad } from '../ui'
+import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, changedFields, compact, str, useLoad, withCurrent } from '../ui'
 
 const EDITABLE = ['full_name', 'account_id', 'job_title', 'email', 'phone', 'linkedin_url', 'owner_id', 'status', 'disqualified_reason', 'source', 'next_action_code', 'next_action_other', 'next_action_due', 'notes'] as const
 
@@ -130,7 +130,7 @@ export default function ProspectRecord() {
               <TextField label="Email" type="email" value={form.email} onChange={(v) => set('email', v)} error={errors.email} />
               <TextField label="Phone" value={form.phone} onChange={(v) => set('phone', v)} />
               <TextField label="LinkedIn URL" value={form.linkedin_url} onChange={(v) => set('linkedin_url', v)} />
-              <SelectField label="Source" value={form.source} onChange={(v) => set('source', v)} options={lists.sources} placeholder="Choose…" />
+              <SelectField label="Source" value={form.source} onChange={(v) => set('source', v)} options={withCurrent(lists.sources, form.source)} placeholder="Choose…" />
             </div>
             <TextField label="Notes" multiline value={form.notes} onChange={(v) => set('notes', v)} />
           </section>

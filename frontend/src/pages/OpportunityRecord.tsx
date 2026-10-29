@@ -9,7 +9,7 @@ import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import { MeetingsCard } from '../components/Meetings'
 import type { Account, AccountDetail, FormValue, FormValues, Issue, OpportunityDetail, Prospect } from '../types'
-import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, TextField, WarningsBanner, changedFields, useLoad } from '../ui'
+import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, TextField, WarningsBanner, changedFields, useLoad, withCurrent } from '../ui'
 
 const EDITABLE = [
   'name', 'account_id', 'primary_contact_id', 'owner_id', 'stage', 'estimated_value', 'currency', 'expected_close', 'geography',
@@ -141,7 +141,7 @@ export default function OpportunityRecord() {
                 options={lists.stages.map((s) => ({ value: s.name, label: `${s.name} · ${s.probability}%` }))} />
               <TextField label="Estimated deal value" required={qualifiedPlus} value={form.estimated_value} onChange={(v) => set('estimated_value', v)}
                 error={errors.estimated_value} hint={`Weighted at ${prob}%: kept separate from actual contract value`} />
-              <SelectField label="Currency" required value={form.currency} onChange={(v) => set('currency', v)} options={lists.currencies} error={errors.currency} />
+              <SelectField label="Currency" required value={form.currency} onChange={(v) => set('currency', v)} options={withCurrent(lists.currencies, form.currency)} error={errors.currency} />
               <TextField label="Expected close date" type="date" required={idx >= 3 && !closed} value={form.expected_close} onChange={(v) => set('expected_close', v || null)} error={errors.expected_close} />
               <TextField label="Geography" required value={form.geography} onChange={(v) => set('geography', v)} error={errors.geography} hint="Defaults from the account" />
               <SelectField label="Risk rating" required={qualifiedPlus} value={form.risk_rating} onChange={(v) => set('risk_rating', v)} options={lists.risk_ratings} error={errors.risk_rating} />
@@ -161,7 +161,7 @@ export default function OpportunityRecord() {
               <SelectField label="Put on Nurture?" required value={form.on_nurture ? 'Yes' : 'No'} onChange={(v) => set('on_nurture', v === 'Yes')} options={['No', 'Yes']}
                 error={errors.on_nurture} hint={closed ? 'Not available for Won or Lost' : 'Flag only: stage and history are kept'} />
               {!!form.on_nurture && !closed && <>
-                <SelectField label="Nurture reason" required value={form.nurture_reason} onChange={(v) => set('nurture_reason', v)} options={lists.nurture_reasons} placeholder="Choose…" error={errors.nurture_reason} />
+                <SelectField label="Nurture reason" required value={form.nurture_reason} onChange={(v) => set('nurture_reason', v)} options={withCurrent(lists.nurture_reasons, form.nurture_reason)} placeholder="Choose…" error={errors.nurture_reason} />
                 <TextField label="Nurture until (revisit)" type="date" required value={form.nurture_until} onChange={(v) => set('nurture_until', v || null)} error={errors.nurture_until} />
                 <OwnerField label="Nurture owner" required={false} value={form.nurture_owner_id} onChange={(v) => set('nurture_owner_id', v)} />
                 <NextActionFields value={form} onChange={setForm} errors={errors} prefix="nurture_next_action" withDue={false} />
@@ -182,7 +182,7 @@ export default function OpportunityRecord() {
             <section className="card" aria-label="Closed lost" style={{ borderColor: '#E8A08F' }}>
               <h2>Closed lost</h2>
               <div className="grid-fields">
-                <SelectField label="Lost reason" required value={form.lost_reason} onChange={(v) => set('lost_reason', v)} options={lists.lost_reasons} placeholder="Choose…" error={errors.lost_reason} />
+                <SelectField label="Lost reason" required value={form.lost_reason} onChange={(v) => set('lost_reason', v)} options={withCurrent(lists.lost_reasons, form.lost_reason)} placeholder="Choose…" error={errors.lost_reason} />
                 <TextField label="Lost notes" value={form.lost_notes} onChange={(v) => set('lost_notes', v)} />
                 <TextField label="Lost date" type="date" required value={form.lost_date} onChange={(v) => set('lost_date', v || null)} error={errors.lost_date} />
               </div>
@@ -195,8 +195,8 @@ export default function OpportunityRecord() {
           {more && (
             <section className="card" aria-label="More details">
               <div className="grid-fields">
-                <SelectField label="Service line / project type" value={form.service_line} onChange={(v) => set('service_line', v)} options={lists.service_lines} placeholder="Choose…" error={errors.service_line} />
-                <SelectField label="Deal source" value={form.deal_source} onChange={(v) => set('deal_source', v)} options={lists.sources} placeholder="Choose…" />
+                <SelectField label="Service line / project type" value={form.service_line} onChange={(v) => set('service_line', v)} options={withCurrent(lists.service_lines, form.service_line)} placeholder="Choose…" error={errors.service_line} />
+                <SelectField label="Deal source" value={form.deal_source} onChange={(v) => set('deal_source', v)} options={withCurrent(lists.sources, form.deal_source)} placeholder="Choose…" />
                 <TextField label="Delivery lead" value={form.delivery_lead} onChange={(v) => set('delivery_lead', v)} />
                 <TextField label="Effort estimate" value={form.effort_estimate} onChange={(v) => set('effort_estimate', v)} />
               </div>

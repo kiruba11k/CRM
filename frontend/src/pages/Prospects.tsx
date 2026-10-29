@@ -54,7 +54,7 @@ export default function Prospects() {
         <TextField label="Search" value={f.q} onChange={(q) => setF({ ...f, q })} placeholder="Name, email, account" />
         <SelectField label="Status" value={f.status} onChange={(status) => setF({ ...f, status })} options={lists.prospect_statuses} placeholder="All statuses" />
         <SelectField label="Geography" value={f.country} onChange={(country) => setF({ ...f, country })} options={countries} placeholder="All countries" />
-        <SelectField label="Source" value={f.source} onChange={(source) => setF({ ...f, source })} options={lists.sources} placeholder="All sources" />
+        <SelectField label="Source" value={f.source} onChange={(source) => setF({ ...f, source })} options={[...lists.sources, ...lists.retired.sources]} placeholder="All sources" />
         <SelectField label="Next action" value={f.next_action} onChange={(next_action) => setF({ ...f, next_action })} placeholder="All next actions"
           options={lists.next_actions.map((n) => ({ value: n.code, label: n.label }))} />
       </div>

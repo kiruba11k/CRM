@@ -15,7 +15,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from .. import google_calendar as gc
+from .. import domain, google_calendar as gc
 from ..auth import User, current_user, get_con
 from ..config import Settings, get_settings
 from ..records import log_activity, raise_if_errors
@@ -241,6 +241,9 @@ def _when(m: dict) -> str:
 async def create_meeting(body: MeetingIn, request: Request, con: asyncpg.Connection = Depends(get_con),
                          settings: Settings = Depends(get_settings), user: User = Depends(current_user)):
     rec = body.model_dump()
+    for k, setting in (("reminder_15", "meeting_15"), ("reminder_day", "meeting_day")):
+        if rec[k] is None:
+            rec[k] = bool(domain.REMINDERS[setting])
     rec["attendees"] = list(dict.fromkeys(a.strip().lower() for a in rec["attendees"] if a.strip()))
     raise_if_errors(_check_meeting(rec))
     if rec["entity_type"]:

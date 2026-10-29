@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends
 
 from .. import domain
 from ..auth import User, current_user, get_con
-from ..config import Settings, get_settings
 
 router = APIRouter(prefix="/actions", tags=["actions"])
 
@@ -38,11 +37,11 @@ async def my_actions(
     as_of: Optional[date] = None,
     con: asyncpg.Connection = Depends(get_con),
     user: User = Depends(current_user),
-    settings: Settings = Depends(get_settings),
 ):
     today = as_of or date.today()
     owner = UUID(user.id) if scope == "me" else None
     sections = {"overdue": [], "today": [], "upcoming": [], "nurture": []}
+    rem = domain.REMINDERS
     for r in await con.fetch(_SQL, owner):
         item = dict(r)
         item["label"] = domain.next_action_label(item["code"], item["other"])
@@ -52,14 +51,17 @@ async def my_actions(
             sections["nurture"].append(item)
         elif due < today:
             item["business_days_overdue"] = domain.business_days_between(due, today)
-            item["escalated"] = item["business_days_overdue"] >= settings.escalation_business_days
+            item["escalated"] = bool(rem["escalation"]) and item["business_days_overdue"] >= rem["escalation_days"]
             sections["overdue"].append(item)
         elif due == today:
             sections["today"].append(item)
         else:
             item["days_until"] = (due - today).days
+            # Optional §5 reminder one business day before the due date.
+            item["due_next_business_day"] = bool(rem["due_before"]) and domain.business_days_between(today, due) == 1
             sections["upcoming"].append(item)
     counts = {k: len(v) for k, v in sections.items()}
     counts["next_7_days"] = sum(1 for i in sections["upcoming"] if i["days_until"] <= 7)
     counts["escalated"] = sum(1 for i in sections["overdue"] if i["escalated"])
+    counts["due_next_business_day"] = sum(1 for i in sections["upcoming"] if i["due_next_business_day"])
     return {"as_of": today, "scope": scope, "counts": counts, **sections}

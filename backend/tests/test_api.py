@@ -147,7 +147,7 @@ def test_my_actions_grouping_and_escalation(client):
     make_opp(client, acc["id"], name="Later", next_action_due="2026-11-20")
     make_opp(client, acc["id"], as_=REP2, name="Someone else's", next_action_due="2026-10-29")
     mine = client.get("/api/actions", params={"as_of": "2026-10-29"}).json()
-    assert mine["counts"] == {"overdue": 2, "today": 1, "upcoming": 1, "nurture": 0, "next_7_days": 0, "escalated": 1}
+    assert mine["counts"] == {"overdue": 2, "today": 1, "upcoming": 1, "nurture": 0, "next_7_days": 0, "escalated": 1, "due_next_business_day": 0}
     team = client.get("/api/actions", params={"as_of": "2026-10-29", "scope": "team"}, as_=MANAGER).json()
     assert team["counts"]["today"] == 2
 

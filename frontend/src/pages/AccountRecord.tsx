@@ -5,7 +5,7 @@ import { fmtDate, money, moneyByCurrency, nextActionLabel, totalsByCurrency } fr
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import type { AccountDetail, FormValue, FormValues } from '../types'
-import { Banner, ErrorBanner, OwnerField, SelectField, StatusPill, Tabs, TextField, changedFields, useLoad } from '../ui'
+import { Banner, ErrorBanner, OwnerField, SelectField, StatusPill, Tabs, TextField, changedFields, useLoad, withCurrent } from '../ui'
 
 const EDITABLE = ['name', 'country', 'region', 'industry', 'owner_id', 'status', 'website', 'linkedin_url', 'notes'] as const
 type Tab = 'opps' | 'people' | 'activity'
@@ -110,7 +110,7 @@ export default function AccountRecord() {
             <TextField label="Country" required value={form.country} onChange={(v) => set('country', v)} error={errors.country} />
             <TextField label="Region / city" value={form.region} onChange={(v) => set('region', v)} />
             <TextField label="Industry / segment" value={form.industry} onChange={(v) => set('industry', v)} />
-            <SelectField label="Account status" value={form.status} onChange={(v) => set('status', v)} options={lists.account_statuses} />
+            <SelectField label="Account status" value={form.status} onChange={(v) => set('status', v)} options={withCurrent(lists.account_statuses, form.status)} />
             <OwnerField label="Account owner" required={false} value={form.owner_id} onChange={(v) => set('owner_id', v)} error={errors.owner_id} />
             <TextField label="Website" value={form.website} onChange={(v) => set('website', v)} />
             <TextField label="LinkedIn company URL" value={form.linkedin_url} onChange={(v) => set('linkedin_url', v)} />

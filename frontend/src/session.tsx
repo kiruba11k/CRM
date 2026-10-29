@@ -9,6 +9,7 @@ export interface Session extends SessionState {
   signIn: (idToken: string) => void
   signOut: () => void
   refreshUsers: () => Promise<void>
+  refreshLists: () => Promise<void>
 }
 // Screens only render once signed in, so they can rely on user/lists.
 export interface ReadySession extends Session { user: User; lists: Lists }
@@ -46,7 +47,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, users }))
   }, [])
 
-  return <SessionCtx.Provider value={{ ...state, signIn, signOut, refreshUsers }}>{children}</SessionCtx.Provider>
+  // Controlled lists can be edited in Settings: refetch after an edit and
+  // whenever the tab regains focus, so everyone picks up changes.
+  const refreshLists = useCallback(async () => {
+    const lists = await api<Lists>('/lists')
+    setState((s) => (s.status === 'ready' ? { ...s, lists } : s))
+  }, [])
+  useEffect(() => {
+    if (state.status !== 'ready') return
+    const onFocus = () => { void refreshLists().catch(() => undefined) }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [state.status, refreshLists])
+
+  return <SessionCtx.Provider value={{ ...state, signIn, signOut, refreshUsers, refreshLists }}>{children}</SessionCtx.Provider>
 }
 
 export function useSessionState(): Session {

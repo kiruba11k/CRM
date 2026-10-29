@@ -20,7 +20,20 @@ export interface Lists {
   service_lines: string[]
   currencies: string[]
   roles: Role[]
+  retired: Record<EditableList, string[]>
+  reminders: ReminderSettings
 }
+
+export type EditableList = 'sources' | 'nurture_reasons' | 'lost_reasons' | 'service_lines' | 'account_statuses' | 'currencies'
+export interface ReminderSettings { meeting_15: boolean; meeting_day: boolean; due_before: boolean; escalation: boolean; escalation_days: number }
+export interface SettingsView {
+  lists: Record<EditableList, { label: string; options: { value: string; active: boolean; in_use: number; protected: boolean }[] }>
+  stages: { name: string; probability: number; editable: boolean; default: number }[]
+  reminders: ReminderSettings
+  reminder_defaults: ReminderSettings
+}
+export interface ChecklistItem { key: string; kind: 'decision' | 'test'; name: string; detail: string; done: boolean; note: string | null; updated_by: string | null; updated_at: string | null }
+export interface SettingsChange { area: string; summary: string; changed_at: string; changed_by: string | null }
 
 export interface Issue { field: string; message: string }
 
@@ -72,11 +85,11 @@ export type ActionKind = 'prospect' | 'opportunity' | 'nurture'
 export interface ActionItem {
   kind: ActionKind; id: string; title: string; account_name: string | null; owner_id: string | null; owner_name: string | null
   code: string | null; other: string | null; due: string; nurture_reason: string | null; label: string
-  days_until?: number | null; business_days_overdue?: number; escalated?: boolean
+  days_until?: number | null; business_days_overdue?: number; escalated?: boolean; due_next_business_day?: boolean
 }
 export interface ActionsResponse {
   as_of: string; scope: 'me' | 'team'
-  counts: { overdue: number; today: number; upcoming: number; nurture: number; next_7_days: number; escalated: number }
+  counts: { overdue: number; today: number; upcoming: number; nurture: number; next_7_days: number; escalated: number; due_next_business_day: number }
   overdue: ActionItem[]; today: ActionItem[]; upcoming: ActionItem[]; nurture: ActionItem[]
 }
 

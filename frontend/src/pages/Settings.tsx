@@ -1,101 +1,251 @@
-// §8 Settings: controlled lists, reminders, users & roles, Google
-// integrations, export & backup, and the launch checklist (§9, §10).
-// Users & roles and CSV export are live; list editing, reminder toggles and
-// a shared launch checklist arrive with the Phase 5 backend.
-import { useState } from 'react'
+// §8 Settings: controlled lists and stage probabilities, reminders, users
+// & roles, Google integrations, export & backup, the shared launch
+// checklist (§9, §10) and a log of every settings change.
+import { useEffect, useState } from 'react'
 import { ApiError, api, downloadCsv } from '../api'
+import { fmtDateTime } from '../format'
 import { useSession } from '../session'
-import type { CalendarStatus, Lists, Role, User } from '../types'
-import { Banner, ErrorBanner, Tabs, useLoad } from '../ui'
+import type { CalendarStatus, ChecklistItem, EditableList, ReminderSettings, Role, SettingsChange, SettingsView, User } from '../types'
+import { Banner, ErrorBanner, Tabs, TextField, useLoad } from '../ui'
 
-type Tab = 'lists' | 'reminders' | 'roles' | 'integrations' | 'data' | 'launch'
+type Tab = 'lists' | 'reminders' | 'roles' | 'integrations' | 'data' | 'launch' | 'log'
 type Tag = 'required' | 'confirm' | 'configurable'
 
 const TAG: Record<Tag, { label: string; pill: string }> = {
-  required: { label: 'Required v2 rule', pill: 'paper' },
+  required: { label: 'Fixed v2 rule', pill: 'paper' },
   confirm: { label: 'Confirm before production', pill: 'amber' },
   configurable: { label: 'Configurable', pill: 'teal' },
 }
 
-interface ListDef { name: string; tag: Tag; note: string; items: { code: string; label: string; extra?: string }[] }
+type Panel = { kind: 'fixed'; id: string } | { kind: 'stages' } | { kind: 'list'; key: EditableList }
+const EDITABLE: { key: EditableList; tag: Tag; note: string }[] = [
+  { key: 'nurture_reasons', tag: 'configurable', note: 'Required when Put on Nurture = Yes.' },
+  { key: 'lost_reasons', tag: 'configurable', note: 'Required when an opportunity is marked Lost. Optional notes go in a separate field.' },
+  { key: 'service_lines', tag: 'confirm', note: 'Spec examples. Confirm the exact services before launch.' },
+  { key: 'sources', tag: 'configurable', note: 'Used for prospects and deal source.' },
+  { key: 'account_statuses', tag: 'configurable', note: '' },
+  { key: 'currencies', tag: 'confirm', note: 'Multi-currency is on. Unlike currencies are never summed until an FX rule is agreed. Use three-letter ISO codes.' },
+]
 
-const numbered = (arr: string[]) => arr.map((label, i) => ({ code: String(i + 1).padStart(2, '0'), label }))
-
-function listDefs(l: Lists): ListDef[] {
-  return [
-    { name: 'Next actions', tag: 'required', note: `Shared by prospects and opportunities. Free text only through “Other”, which needs a description of ${l.other_max_length} characters or fewer, stored in a separate field.`,
-      items: l.next_actions.map((n) => ({ code: n.code, label: n.label, extra: n.code === l.other_code ? `max ${l.other_max_length} chars` : undefined })) },
-    { name: 'Opportunity stages', tag: 'confirm', note: 'Starter probabilities. Recalibrate from real conversion data after the pilot. Weighted = estimated value × probability.',
-      items: l.stages.map((s, i) => ({ code: String(i + 1).padStart(2, '0'), label: s.name, extra: `${s.probability}%` })) },
-    { name: 'Prospect statuses', tag: 'confirm', note: 'Separate from the opportunity flag “Put on Nurture?”: prospects and opportunities have different lifecycles.', items: numbered(l.prospect_statuses) },
-    { name: 'Nurture reasons', tag: 'configurable', note: 'Required when Put on Nurture = Yes.', items: numbered(l.nurture_reasons) },
-    { name: 'Lost reasons', tag: 'configurable', note: 'Required when an opportunity is marked Lost. Optional notes go in a separate field.', items: numbered(l.lost_reasons) },
-    { name: 'Service lines', tag: 'confirm', note: 'Spec examples. Confirm the exact services before launch.', items: numbered(l.service_lines) },
-    { name: 'Sources', tag: 'configurable', note: 'Used for prospects and deal source.', items: numbered(l.sources) },
-    { name: 'Account statuses', tag: 'configurable', note: '', items: numbered(l.account_statuses) },
-    { name: 'Risk ratings', tag: 'required', note: 'Qualified and later need a rating; High needs a reason and a mitigation.', items: numbered(l.risk_ratings) },
-    { name: 'Currencies & FX', tag: 'confirm', note: 'Multi-currency is on. Unlike currencies are never summed until an FX rule is agreed.',
-      items: l.currencies.map((c, i) => ({ code: c, label: c, extra: i === 0 ? 'base' : 'no FX rule' })) },
-  ]
+// Admin edits return the whole settings view; refresh the session's lists too.
+function useSettingsAction(onView: (v: SettingsView) => void) {
+  const { refreshLists } = useSession()
+  const [error, setError] = useState<ApiError | null>(null)
+  const [busy, setBusy] = useState(false)
+  async function run(path: string, method: 'POST' | 'PATCH' | 'PUT', body: unknown) {
+    setBusy(true)
+    setError(null)
+    try {
+      onView(await api<SettingsView>(path, { method, body }))
+      await refreshLists()
+      return true
+    } catch (e) { setError(e as ApiError); return false } finally { setBusy(false) }
+  }
+  return { run, error, setError, busy }
 }
 
-function ListsTab() {
+function FixedList({ id }: { id: string }) {
   const { lists } = useSession()
-  const defs = listDefs(lists)
-  const [sel, setSel] = useState(0)
-  const cur = defs[sel]
+  const fixed: Record<string, { name: string; note: string; items: [string, string][] }> = {
+    next_actions: { name: 'Next actions', note: `Shared by prospects and opportunities. Free text only through “Other”, which needs a description of ${lists.other_max_length} characters or fewer.`,
+      items: lists.next_actions.map((n) => [n.code, n.label]) },
+    prospect_statuses: { name: 'Prospect statuses', note: 'Separate from the opportunity flag “Put on Nurture?”: prospects and opportunities have different lifecycles.',
+      items: lists.prospect_statuses.map((s, i) => [String(i + 1).padStart(2, '0'), s]) },
+    risk_ratings: { name: 'Risk ratings', note: 'Qualified and later need a rating; High needs a reason and a mitigation.',
+      items: lists.risk_ratings.map((s, i) => [String(i + 1).padStart(2, '0'), s]) },
+  }
+  const d = fixed[id]
+  return (
+    <section className="card col-main" aria-label={d.name}>
+      <div className="card-head"><h2>{d.name}</h2><span className={`pill pill-${TAG.required.pill}`}>{TAG.required.label}</span></div>
+      <p className="muted" style={{ margin: 0 }}>{d.note} These values are fixed by the v2 specification, so they aren’t editable.</p>
+      <div>{d.items.map(([code, label]) => <div className="list-row" key={code}><span><span className="mono muted">{code}</span>&nbsp;&nbsp;{label}</span></div>)}</div>
+    </section>
+  )
+}
+
+function StagesPanel({ view, onView, admin }: { view: SettingsView; onView: (v: SettingsView) => void; admin: boolean }) {
+  const [probs, setProbs] = useState<Record<string, string>>(() => Object.fromEntries(view.stages.map((s) => [s.name, String(s.probability)])))
+  const [saved, setSaved] = useState(false)
+  const act = useSettingsAction(onView)
+  const changed = view.stages.some((s) => s.editable && String(s.probability) !== probs[s.name])
+  async function save() {
+    setSaved(false)
+    const body = { probabilities: Object.fromEntries(view.stages.filter((s) => s.editable).map((s) => [s.name, Number(probs[s.name])])) }
+    if (await act.run('/settings/stages', 'PUT', body)) setSaved(true)
+  }
+  return (
+    <section className="card col-main" aria-label="Opportunity stages">
+      <div className="card-head"><h2>Opportunity stages</h2><span className={`pill pill-${TAG.confirm.pill}`}>{TAG.confirm.label}</span></div>
+      <p className="muted" style={{ margin: 0 }}>Stage names are fixed. Probabilities are starter values: recalibrate them from real conversion data after the pilot. Weighted value = estimated value × probability, so a change updates every forecast at once.</p>
+      <ErrorBanner error={act.error} onClose={() => act.setError(null)} />
+      {saved && <Banner onClose={() => setSaved(false)}>Probabilities saved. Forecasts now use them.</Banner>}
+      <div>
+        {view.stages.map((s, i) => (
+          <div className="list-row" key={s.name}>
+            <span><span className="mono muted">{String(i + 1).padStart(2, '0')}</span>&nbsp;&nbsp;{s.name}{s.editable && s.probability !== s.default ? <span className="muted small"> · spec default {s.default}%</span> : ''}</span>
+            {s.editable && admin ? (
+              <span className="row" style={{ gap: 6 }}>
+                <input className="input" style={{ width: 80 }} type="number" min={1} max={99} aria-label={`${s.name} probability`}
+                  value={probs[s.name]} onChange={(e) => setProbs({ ...probs, [s.name]: e.target.value })} /> %
+              </span>
+            ) : <span className="pill pill-grey">{s.probability}%</span>}
+          </div>
+        ))}
+      </div>
+      {admin && <div className="row"><button type="button" className="btn btn-dark" disabled={!changed || act.busy} onClick={() => void save()}>Save probabilities</button>
+        <span className="muted small">Must rise with each stage, between 1% and 99%. Won is always 100%, Lost 0%.</span></div>}
+    </section>
+  )
+}
+
+function EditableListPanel({ listKey, view, onView, admin }: { listKey: EditableList; view: SettingsView; onView: (v: SettingsView) => void; admin: boolean }) {
+  const def = EDITABLE.find((e) => e.key === listKey)!
+  const list = view.lists[listKey]
+  const [adding, setAdding] = useState('')
+  const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null)
+  const act = useSettingsAction(onView)
+  const values = list.options.map((o) => o.value)
+  const move = (i: number, d: number) => {
+    const next = [...values]
+    ;[next[i], next[i + d]] = [next[i + d], next[i]]
+    void act.run(`/settings/lists/${listKey}/order`, 'PUT', { values: next })
+  }
+  return (
+    <section className="card col-main" aria-label={list.label}>
+      <div className="card-head"><h2>{list.label}</h2><span className={`pill pill-${TAG[def.tag].pill}`}>{TAG[def.tag].label}</span></div>
+      {def.note && <p className="muted" style={{ margin: 0 }}>{def.note}</p>}
+      <ErrorBanner error={act.error} onClose={() => act.setError(null)} />
+      <div>
+        {list.options.map((o, i) => (
+          <div className="list-row" key={o.value} style={{ opacity: o.active ? 1 : 0.65 }}>
+            {renaming?.from === o.value ? (
+              <span className="row" style={{ flex: '1 1 260px' }}>
+                <input className="input" aria-label={`New name for ${o.value}`} value={renaming.to} onChange={(e) => setRenaming({ ...renaming, to: e.target.value })} />
+                <button type="button" className="btn btn-dark" disabled={act.busy}
+                  onClick={() => void act.run(`/settings/lists/${listKey}`, 'PATCH', { value: o.value, rename_to: renaming.to }).then((ok) => ok && setRenaming(null))}>Save</button>
+                <button type="button" className="btn" onClick={() => setRenaming(null)}>Cancel</button>
+              </span>
+            ) : (
+              <span style={{ flex: '1 1 260px' }}>
+                <span className="mono muted">{String(i + 1).padStart(2, '0')}</span>&nbsp;&nbsp;{o.value}
+                <span className="muted small"> · {o.in_use} record{o.in_use === 1 ? '' : 's'}</span>
+                {!o.active && <span className="pill pill-grey" style={{ marginLeft: 8 }}>Retired</span>}
+                {o.protected && <span className="pill pill-paper" style={{ marginLeft: 8 }}>Used by the CRM</span>}
+              </span>
+            )}
+            {admin && renaming?.from !== o.value && (
+              <span className="row" style={{ gap: 6 }}>
+                <button type="button" className="btn" aria-label={`Move ${o.value} up`} disabled={i === 0 || act.busy} onClick={() => move(i, -1)}>↑</button>
+                <button type="button" className="btn" aria-label={`Move ${o.value} down`} disabled={i === list.options.length - 1 || act.busy} onClick={() => move(i, 1)}>↓</button>
+                {listKey !== 'currencies' && !o.protected && <button type="button" className="btn" onClick={() => setRenaming({ from: o.value, to: o.value })}>Rename</button>}
+                {!o.protected && <button type="button" className="btn" disabled={act.busy}
+                  onClick={() => void act.run(`/settings/lists/${listKey}`, 'PATCH', { value: o.value, active: !o.active })}>{o.active ? 'Retire' : 'Restore'}</button>}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      {admin ? (
+        <>
+          <div className="row-end">
+            <div style={{ flex: '1 1 260px' }}><TextField label="Add an option" value={adding} onChange={setAdding} placeholder={listKey === 'currencies' ? 'e.g. CHF' : 'New option'} /></div>
+            <button type="button" className="btn btn-dark" disabled={!adding.trim() || act.busy}
+              onClick={() => void act.run(`/settings/lists/${listKey}`, 'POST', { value: adding }).then((ok) => ok && setAdding(''))}>Add</button>
+          </div>
+          <span className="muted small">Renaming updates every record that uses the option. Retiring hides it from dropdowns; records that already use it keep it.</span>
+        </>
+      ) : <span className="muted small">Only admins change controlled lists.</span>}
+    </section>
+  )
+}
+
+function ListsTab({ view, onView }: { view: SettingsView; onView: (v: SettingsView) => void }) {
+  const { user } = useSession()
+  const admin = user.role === 'admin'
+  const [panel, setPanel] = useState<Panel>({ kind: 'list', key: 'nurture_reasons' })
+  const fixedNames: [string, string][] = [['next_actions', 'Next actions'], ['prospect_statuses', 'Prospect statuses'], ['risk_ratings', 'Risk ratings']]
+  const isSel = (p: Panel) => JSON.stringify(p) === JSON.stringify(panel)
   return (
     <div className="cols">
       <div className="card col-side" style={{ flexBasis: 240 }}>
         <div className="side-list" role="group" aria-label="Lists">
-          {defs.map((d, i) => (
-            <button key={d.name} type="button" aria-pressed={sel === i} onClick={() => setSel(i)}>
-              <span>{d.name}</span><span className="muted small">{d.items.length}</span>
+          {EDITABLE.map((e) => (
+            <button key={e.key} type="button" aria-pressed={isSel({ kind: 'list', key: e.key })} onClick={() => setPanel({ kind: 'list', key: e.key })}>
+              <span>{view.lists[e.key].label}</span><span className="muted small">{view.lists[e.key].options.filter((o) => o.active).length}</span>
+            </button>
+          ))}
+          <button type="button" aria-pressed={isSel({ kind: 'stages' })} onClick={() => setPanel({ kind: 'stages' })}>
+            <span>Opportunity stages</span><span className="muted small">{view.stages.length}</span>
+          </button>
+          {fixedNames.map(([id, name]) => (
+            <button key={id} type="button" aria-pressed={isSel({ kind: 'fixed', id })} onClick={() => setPanel({ kind: 'fixed', id })}>
+              <span>{name}</span><span className="muted small">fixed</span>
             </button>
           ))}
         </div>
       </div>
-      <section className="card col-main" aria-label={cur.name}>
-        <div className="card-head"><h2>{cur.name}</h2><span className={`pill pill-${TAG[cur.tag].pill}`}>{TAG[cur.tag].label}</span></div>
-        {cur.note && <p className="muted" style={{ margin: 0 }}>{cur.note}</p>}
-        <div>
-          {cur.items.map((it) => (
-            <div className="list-row" key={it.code}>
-              <span><span className="mono muted">{it.code}</span>&nbsp;&nbsp;{it.label}</span>
-              {it.extra && <span className="pill pill-grey">{it.extra}</span>}
-            </div>
-          ))}
-        </div>
-        <Banner kind="warn">These lists are read-only for now: they come from the server and every record is validated against them. Adding and retiring options from this screen arrives with the Settings backend (Phase 5).</Banner>
-      </section>
+      {panel.kind === 'list' && <EditableListPanel key={panel.key} listKey={panel.key} view={view} onView={onView} admin={admin} />}
+      {panel.kind === 'stages' && <StagesPanel view={view} onView={onView} admin={admin} />}
+      {panel.kind === 'fixed' && <FixedList id={panel.id} />}
     </div>
   )
 }
 
-const REMINDERS: [string, string, string][] = [
-  ['Meeting in Calendar', '15-minute reminder before the meeting', 'On (with Calendar sync)'],
-  ['Meeting in Calendar (optional)', 'Day-before reminder', 'Off'],
-  ['Task / next action due', 'Reminder on the due date', 'On'],
-  ['Task / next action due (optional)', 'Reminder one business day before', 'Off'],
-  ['Overdue action', 'Shown in My Actions until done, rescheduled or closed', 'On'],
-  ['Manager escalation', 'Flag to the manager when an action stays overdue', 'On · after 3 business days'],
-  ['Nurture revisit date', 'Reminder on the revisit date; no routine active-deal nudges while nurtured', 'On'],
+const SWITCHES: { key: keyof ReminderSettings; trigger: string; behaviour: string }[] = [
+  { key: 'meeting_15', trigger: 'Meeting in Calendar', behaviour: '15-minute reminder before the meeting (default for new meetings)' },
+  { key: 'meeting_day', trigger: 'Meeting in Calendar (optional)', behaviour: 'Day-before reminder (default for new meetings)' },
+  { key: 'due_before', trigger: 'Next action due (optional)', behaviour: 'Flag actions due the next business day in My Actions' },
+  { key: 'escalation', trigger: 'Manager escalation', behaviour: 'Flag an action to managers when it stays overdue' },
+]
+const ALWAYS: [string, string][] = [
+  ['Next action due', 'Shown in Due today in My Actions on the due date'],
+  ['Overdue action', 'Stays in My Actions until done, rescheduled or closed'],
+  ['Nurture revisit date', 'Reminder on the revisit date; no routine active-deal nudges while nurtured'],
 ]
 
-function RemindersTab() {
+function RemindersTab({ view, onView }: { view: SettingsView; onView: (v: SettingsView) => void }) {
+  const { user } = useSession()
+  const admin = user.role === 'admin'
+  const act = useSettingsAction(onView)
+  // Show the change at once; fall back to the saved values if it fails.
+  const [r, setR] = useState<ReminderSettings>(view.reminders)
+  useEffect(() => setR(view.reminders), [view.reminders])
+  const set = (patch: Partial<ReminderSettings>) => {
+    setR((cur) => ({ ...cur, ...patch }))
+    void act.run('/settings/reminders', 'PUT', patch).then((ok) => { if (!ok) setR(view.reminders) })
+  }
   return (
-    <section className="card" aria-label="Reminder defaults">
-      <h2>Reminder defaults (§5)</h2>
+    <section className="card" aria-label="Reminders">
+      <h2>Reminders (§5)</h2>
+      <ErrorBanner error={act.error} onClose={() => act.setError(null)} />
       <div>
-        {REMINDERS.map(([trigger, behaviour, state]) => (
-          <div className="list-row" key={trigger + behaviour}>
-            <span><strong>{trigger}</strong><br /><span className="muted small">{behaviour}</span></span>
-            <span className={`pill pill-${state.startsWith('Off') ? 'grey' : 'teal'}`}>{state}</span>
+        {SWITCHES.map((s) => (
+          <div className="list-row" key={s.key}>
+            <span style={{ flex: '1 1 320px' }}><strong>{s.trigger}</strong><br /><span className="muted small">{s.behaviour}</span></span>
+            {admin ? (
+              <label className="check"><input type="checkbox" checked={!!r[s.key]} onChange={(e) => set({ [s.key]: e.target.checked })} /> {r[s.key] ? 'On' : 'Off'}</label>
+            ) : <span className={`pill pill-${r[s.key] ? 'teal' : 'grey'}`}>{r[s.key] ? 'On' : 'Off'}</span>}
+          </div>
+        ))}
+        <div className="list-row">
+          <span style={{ flex: '1 1 320px' }}><strong>Escalate after</strong><br /><span className="muted small">Business days overdue before an action is flagged to managers</span></span>
+          {admin ? (
+            <select className="input" aria-label="Escalate after business days" value={r.escalation_days} disabled={!r.escalation}
+              onChange={(e) => set({ escalation_days: Number(e.target.value) })}>
+              {[1, 2, 3, 4, 5, 7, 10].map((n) => <option key={n} value={n}>{n} business day{n === 1 ? '' : 's'}</option>)}
+            </select>
+          ) : <span className="pill pill-grey">{r.escalation_days} business days</span>}
+        </div>
+        {ALWAYS.map(([trigger, behaviour]) => (
+          <div className="list-row" key={trigger}>
+            <span style={{ flex: '1 1 320px' }}><strong>{trigger}</strong><br /><span className="muted small">{behaviour}</span></span>
+            <span className="pill pill-paper">Always on (spec)</span>
           </div>
         ))}
       </div>
-      <p className="muted small" style={{ margin: 0 }}>Won, Lost and Disqualified records never get open-record reminders. Nurtured opportunities only get the revisit-date reminder.</p>
-      <Banner kind="warn">Defaults are applied by the server today. The escalation threshold is set with the <span className="mono">CRM_ESCALATION_BUSINESS_DAYS</span> setting on Render. Toggling reminders from this screen arrives with the Settings backend (Phase 5).</Banner>
+      <p className="muted small" style={{ margin: 0 }}>Won, Lost and Disqualified records never get open-record reminders. Nurtured opportunities only get the revisit-date reminder. Meeting reminders are set on each meeting; these are the defaults new meetings start with.</p>
+      {!admin && <span className="muted small">Only admins change reminder settings.</span>}
     </section>
   )
 }
@@ -243,93 +393,108 @@ function DataTab() {
   )
 }
 
-const DECISIONS: [string, string][] = [
-  ['Build platform', 'Custom build: FastAPI, Neon PostgreSQL, React + TypeScript, Render'],
-  ['Number of users', 'Design for a small team; confirm the count'],
-  ['Currency', 'Multi-currency with no summing until an FX rule is agreed'],
-  ['Access rules', 'Shared visibility, owner editing, manager/admin oversight'],
-  ['Geography depth', 'Country required; region/city optional'],
-  ['Opportunity stages', 'Starter stages and probabilities from §3'],
-  ['Prospect statuses', 'List from §3'],
-  ['Google Calendar', 'Implement first'],
-  ['Gmail', 'Contextual links first'],
-  ['Google Tasks', 'Defer'],
-  ['Service-line list', 'Confirm exact services'],
-  ['Reminder defaults', 'Start with §5 defaults, adjust after pilot'],
-]
-const TESTS: [string, string][] = [
-  ['Record relationships', 'One account, many contacts and opportunities, no duplicate accounts'],
-  ['Prospect lifecycle', 'Statuses move freely; a qualified pursuit becomes an opportunity without losing history'],
-  ['Consistent views', 'One update shows in every saved view and report'],
-  ['Next Action dropdown', 'Only listed options or Other; same list for prospects and opportunities'],
-  ['Other validation', 'Description required, 50 characters max'],
-  ['Mandatory follow-up', 'Active prospects and open non-nurtured opportunities need owner, action and due date'],
-  ['Risk validation', 'Qualified needs a rating; High needs reason and mitigation'],
-  ['Nurture validation', 'Yes needs reason, revisit date and action; stage is kept'],
-  ['Nurture reminders/forecast', 'In Nurture Pipeline, out of active forecast, only revisit reminder'],
-  ['Closure', 'Won needs value and date; Lost needs reason and date; reminders stop'],
-  ['Calendar idempotency', 'Updating an event never duplicates it; failures visible and retryable'],
-  ['Permissions', 'Access matches the agreed role model'],
-  ['Export / recovery', 'CSV export works; backup and restore documented'],
-]
-const STORE_KEY = 'ls-crm-launch-checklist'
-
-function loadChecks(): Record<string, boolean> {
-  try { return JSON.parse(localStorage.getItem(STORE_KEY) || '{}') as Record<string, boolean> } catch { return {} }
-}
-
 function LaunchTab() {
-  const [checks, setChecks] = useState<Record<string, boolean>>(loadChecks)
-  const toggle = (k: string) => setChecks((c) => {
-    const next = { ...c, [k]: !c[k] }
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(next)) } catch { /* private mode: keep in memory */ }
-    return next
-  })
-  const count = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => checks[`${prefix}${i}`]).filter(Boolean).length
-  const group = (title: string, prefix: string, rows: [string, string][], done: string) => (
-    <section className="card" aria-label={title}>
-      <div className="card-head"><h2>{title}</h2><span className="muted small">{count(prefix, rows.length)} of {rows.length} {done}</span></div>
-      <div>
-        {rows.map(([name, rec], i) => (
-          <label className="list-row check" key={name} style={{ justifyContent: 'flex-start' }}>
-            <input type="checkbox" checked={!!checks[`${prefix}${i}`]} onChange={() => toggle(`${prefix}${i}`)} />
-            <span><strong>{name}</strong><br /><span className="muted small">{rec}</span></span>
-          </label>
-        ))}
-      </div>
-    </section>
-  )
+  const { user } = useSession()
+  const can = user.role !== 'salesperson'
+  const { data, error, reload } = useLoad(() => api<ChecklistItem[]>('/settings/checklist'), [])
+  const [saveError, setSaveError] = useState<ApiError | null>(null)
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  // Ticks show at once; a failed save puts the box back.
+  const [ticks, setTicks] = useState<Record<string, boolean>>({})
+  const patch = (key: string, body: { done?: boolean; note?: string }) => {
+    if (body.done !== undefined) setTicks((t) => ({ ...t, [key]: body.done as boolean }))
+    return api(`/settings/checklist/${key}`, { method: 'PATCH', body }).then(() => reload())
+      .catch((e: ApiError) => setSaveError(e))
+      .finally(() => setTicks((t) => { const { [key]: _, ...rest } = t; return rest }))
+  }
+  const group = (title: string, kind: ChecklistItem['kind'], doneWord: string) => {
+    const items = (data || []).filter((i) => i.kind === kind).map((i) => (i.key in ticks ? { ...i, done: ticks[i.key] } : i))
+    return (
+      <section className="card" aria-label={title}>
+        <div className="card-head"><h2>{title}</h2><span className="muted small">{items.filter((i) => i.done).length} of {items.length} {doneWord}</span></div>
+        <div>
+          {items.map((i) => (
+            <div className="list-row" key={i.key} style={{ alignItems: 'flex-start' }}>
+              <label className="check" style={{ flex: '1 1 280px', alignItems: 'flex-start' }}>
+                <input type="checkbox" checked={i.done} disabled={!can} onChange={(e) => void patch(i.key, { done: e.target.checked })} />
+                <span><strong>{i.name}</strong><br /><span className="muted small">{i.detail}</span>
+                  {i.updated_by && <><br /><span className="muted small">{i.done ? 'Ticked' : 'Updated'} by {i.updated_by} · {fmtDateTime(i.updated_at)}</span></>}
+                  {i.note && <><br /><span className="small">Note: {i.note}</span></>}
+                </span>
+              </label>
+              {can && (
+                <span className="row" style={{ gap: 6 }}>
+                  <input className="input" style={{ width: 180 }} aria-label={`Note for ${i.name}`} placeholder="Add a note" value={notes[i.key] ?? ''}
+                    onChange={(e) => setNotes({ ...notes, [i.key]: e.target.value })} />
+                  <button type="button" className="btn" disabled={!(notes[i.key] || '').trim()}
+                    onClick={() => void patch(i.key, { note: notes[i.key] }).then(() => setNotes({ ...notes, [i.key]: '' }))}>Save note</button>
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+    )
+  }
   return (
     <>
-      <Banner kind="warn">Ticks are saved in this browser only. A shared launch checklist arrives with the Settings backend (Phase 5).</Banner>
+      <ErrorBanner error={error || saveError} onClose={() => setSaveError(null)} />
+      {!can && <Banner kind="warn">Managers and admins sign off the launch checklist; everyone can see it.</Banner>}
       <div className="cols">
-        <div className="col-main">{group('Decisions to confirm (§10)', 'd', DECISIONS, 'confirmed')}</div>
-        <div className="col-main">{group('Pilot acceptance tests (§9)', 't', TESTS, 'passed')}</div>
+        <div className="col-main">{group('Decisions to confirm (§10)', 'decision', 'confirmed')}</div>
+        <div className="col-main">{group('Pilot acceptance tests (§9)', 'test', 'passed')}</div>
       </div>
     </>
   )
 }
 
+function LogTab() {
+  const { data, error } = useLoad(() => api<SettingsChange[]>('/settings/changes'), [])
+  return (
+    <section className="card" aria-label="Settings change log">
+      <h2>Settings change log</h2>
+      <ErrorBanner error={error} />
+      {(data || []).length === 0 && <p className="muted" style={{ margin: 0 }}>No settings changed yet.</p>}
+      <div>
+        {(data || []).map((c, i) => (
+          <div className="list-row" key={i}>
+            <span style={{ flex: '1 1 320px' }}><strong>{c.area}</strong><br /><span className="small">{c.summary}</span></span>
+            <span className="muted small">{c.changed_by || '—'} · {fmtDateTime(c.changed_at)}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export default function Settings() {
   const [tab, setTab] = useState<Tab>('lists')
+  const settings = useLoad(() => api<SettingsView>('/settings'), [])
+  const [view, setView] = useState<SettingsView | null>(null)
+  const current = view || settings.data
+  const needsView = tab === 'lists' || tab === 'reminders'
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Settings</h1>
-          <p>Controlled lists keep reporting clean; changes here apply to every record.</p>
+          <p>Controlled lists keep reporting clean; changes here apply to every record. Admins edit lists, stages and reminders; every change is logged.</p>
         </div>
       </div>
       <Tabs<Tab> label="Settings sections" value={tab} onChange={setTab} tabs={[
         { value: 'lists', label: 'Controlled lists' }, { value: 'reminders', label: 'Reminders' }, { value: 'roles', label: 'Users & roles' },
         { value: 'integrations', label: 'Google integrations' }, { value: 'data', label: 'Export & backup' }, { value: 'launch', label: 'Launch checklist' },
+        { value: 'log', label: 'Change log' },
       ]} />
-      {tab === 'lists' && <ListsTab />}
-      {tab === 'reminders' && <RemindersTab />}
+      {needsView && <ErrorBanner error={settings.error} />}
+      {needsView && !current && !settings.error && <div className="loading">Loading settings…</div>}
+      {tab === 'lists' && current && <ListsTab view={current} onView={setView} />}
+      {tab === 'reminders' && current && <RemindersTab view={current} onView={setView} />}
       {tab === 'roles' && <RolesTab />}
       {tab === 'integrations' && <IntegrationsTab />}
       {tab === 'data' && <DataTab />}
       {tab === 'launch' && <LaunchTab />}
+      {tab === 'log' && <LogTab />}
     </>
   )
 }

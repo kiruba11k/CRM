@@ -51,7 +51,7 @@ export default function Pipeline() {
       <div className="row-end">
         <div style={{ width: 180 }}><SelectField label="Owner" value={f.owner} onChange={(owner) => setF({ ...f, owner })} placeholder="All owners" options={users.map((u) => ({ value: u.id, label: u.name }))} /></div>
         <div style={{ width: 180 }}><SelectField label="Risk rating" value={f.risk} onChange={(risk) => setF({ ...f, risk })} placeholder="All ratings" options={lists.risk_ratings} /></div>
-        <div style={{ width: 220 }}><SelectField label="Service line" value={f.service} onChange={(service) => setF({ ...f, service })} placeholder="All service lines" options={lists.service_lines} /></div>
+        <div style={{ width: 220 }}><SelectField label="Service line" value={f.service} onChange={(service) => setF({ ...f, service })} placeholder="All service lines" options={[...lists.service_lines, ...lists.retired.service_lines]} /></div>
         <label className="check"><input type="checkbox" checked={showNurture} onChange={() => setShowNurture(!showNurture)} />Show nurtured ({nurtureCount})</label>
       </div>
       <ErrorBanner error={error} />

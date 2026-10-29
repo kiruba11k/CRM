@@ -21,7 +21,7 @@ integration. Staff only (Google Workspace sign-in).
 | 2b | Frontend: Reports & metrics, Settings (lists, reminders, users & roles, integrations, export & backup, launch checklist), Meetings & booking links, Import from HubSpot | **Done**: Reports, users & roles, CSV export live; Meetings opens a pre-filled Google Calendar event and logs it |
 | 3 | HubSpot import: owners, companies, contacts, deals, associations, notes/calls/meetings/tasks, logged emails; re-runnable; Needs cleanup queue | **Done** (`backend/app/importer.py`) |
 | 4 | Google Calendar + Meet sync per user (create, update, cancel, retry, sync log), shared booking links, Gmail links | **Done** (`backend/app/google_calendar.py`, `routers/calendar.py`) |
-| 5 | Editable controlled lists, reminder toggles, shared launch checklist | Planned (Reports done) |
+| 5 | Settings: editable controlled lists (add, rename, reorder, retire), stage probabilities, reminder switches + escalation threshold, shared launch checklist, settings change log | **Done** (`backend/app/routers/settings.py`, `app/listconfig.py`) |
 
 ## Layout
 
@@ -30,10 +30,11 @@ backend/
   app/domain.py        spec rules: lists, stages, validation, follow-up logic (no I/O)
   app/migrations/      plain SQL, applied in order on startup
   app/auth.py          Google ID-token sign-in (Workspace domain only) + role checks
-  app/routers/         accounts, prospects, opportunities, actions, reports, admin, hubspot_import, calendar
+  app/routers/         accounts, prospects, opportunities, actions, reports, admin, hubspot_import, calendar, settings
   app/hubspot.py       read-only HubSpot CRM v3 client (paging, 429 retry)
   app/importer.py      HubSpot → CRM mapping and the import run
   app/google_calendar.py  per-user Google OAuth + Calendar events (encrypted refresh tokens)
+  app/listconfig.py    keeps domain.py's editable lists / probabilities / reminders in sync with the DB
   scripts/seed_demo.py sample data for a local dev database
   tests/               rule tests (no DB) + API tests (real Postgres)
 frontend/
@@ -91,7 +92,9 @@ frontend (`.github/workflows/frontend-checks.yml`).
 | §3 statuses, stages, probabilities, weighted value | `domain.STAGES`, `GET /api/lists`, `GET /api/reports/pipeline`, Pipeline page |
 | §4 risk rating, Put on Nurture?, revisit outcomes | `domain.validate_opportunity`, `POST /api/opportunities/{id}/revisit`, My Actions revisit panel |
 | §5 Next Action list, “Other” ≤ 50 chars, mandatory follow-up | `domain.NEXT_ACTIONS`, `POST …/complete-action`, `NextActionFields` in `frontend/src/ui.tsx` |
-| §5.4 escalation after N business days | `GET /api/actions` (`escalated`), `CRM_ESCALATION_BUSINESS_DAYS` |
+| §5.4 escalation after N business days | `GET /api/actions` (`escalated`); threshold in Settings → Reminders (`CRM_ESCALATION_BUSINESS_DAYS` is only the starting value) |
+| §8 configurable lists, stage probabilities, reminders | `PUT/PATCH/POST /api/settings/*`; renames update records, retired options stay valid on records that use them; every change in `settings_changes` |
+| §9/§10 launch checklist | `GET/PATCH /api/settings/checklist` (shared, managers and admins tick) |
 | §7 views | My Actions, Prospects, Pipeline, Forecast & views pages |
 | §8.1 roles (proposed: confirm) | `auth.py`: salesperson edits own records; manager/admin edit all; admin manages users |
 | §8.3 history & audit | `record_history` table, history panel on every record, `GET /api/export/history.csv` |

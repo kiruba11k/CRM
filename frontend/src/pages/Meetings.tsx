@@ -88,6 +88,7 @@ function MeetingRow({ m, onChange }: { m: Meeting; onChange: () => void }) {
 }
 
 function ScheduleTab({ status, reloadStatus }: { status: CalendarStatus; reloadStatus: () => void }) {
+  const { lists } = useSession()
   const [params] = useSearchParams()
   const opps = useLoad(() => api<Opportunity[]>('/opportunities', { params: { open_only: true, include_nurtured: true } }), [])
   const prospects = useLoad(() => api<Prospect[]>('/prospects', { params: { scope: 'all' } }), [])
@@ -98,8 +99,8 @@ function ScheduleTab({ status, reloadStatus }: { status: CalendarStatus; reloadS
   const [when, setWhen] = useState('')
   const [minutes, setMinutes] = useState<string | null>('30')
   const [meet, setMeet] = useState(true)
-  const [r15, setR15] = useState(true)
-  const [rDay, setRDay] = useState(false)
+  const [r15, setR15] = useState(lists.reminders.meeting_15)
+  const [rDay, setRDay] = useState(lists.reminders.meeting_day)
   const [error, setError] = useState<ApiError | Error | null>(null)
   const [result, setResult] = useState<Meeting | null>(null)
   const [saving, setSaving] = useState(false)

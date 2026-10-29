@@ -38,7 +38,7 @@ async def _truncate():
     con = await asyncpg.connect(RAW_DB)
     try:
         await con.execute(
-            "TRUNCATE calendar_sync_log, meetings, calendar_connections, booking_links, import_runs, record_history, activities, opportunity_team, opportunities, prospects, accounts, users RESTART IDENTITY CASCADE"
+            "TRUNCATE settings_changes, launch_checklist, app_settings, list_options, calendar_sync_log, meetings, calendar_connections, booking_links, import_runs, record_history, activities, opportunity_team, opportunities, prospects, accounts, users RESTART IDENTITY CASCADE"
         )
     finally:
         await con.close()
@@ -51,7 +51,7 @@ def app():
     os.environ.update(
         CRM_DATABASE_URL=TEST_DB, CRM_DEV_AUTH="true", CRM_ADMIN_EMAILS=ADMIN, CRM_ALLOWED_DOMAIN="leadstrategus.com", CRM_HUBSPOT_TOKEN="test-token",
         CRM_GOOGLE_CLIENT_ID="test-client", CRM_GOOGLE_CLIENT_SECRET="test-secret", CRM_PUBLIC_API_URL="http://testserver",
-        CRM_TOKEN_KEY="test-token-key"
+        CRM_TOKEN_KEY="test-token-key", CRM_CONFIG_REFRESH_SECONDS="0"
     )
     from app.config import get_settings
 
@@ -70,6 +70,9 @@ def client(app):
     with TestClient(app) as c:
         yield Api(c)
     _run(_truncate())
+    from app import domain
+
+    domain.reset_config()
 
 
 def _tables_exist() -> bool:

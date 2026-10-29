@@ -10,8 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from .config import get_settings
+from . import domain, listconfig
 from .db import create_pool, migrate
-from .routers import accounts, actions, admin, calendar, hubspot_import, opportunities, prospects, reports
+from .routers import accounts, actions, admin, calendar, hubspot_import, opportunities, prospects, reports, settings as settings_router
 
 
 @asynccontextmanager
@@ -22,6 +23,9 @@ async def lifespan(app: FastAPI):
     app.state.pool = await create_pool(settings.database_url)
     await migrate(app.state.pool)
     await hubspot_import.mark_interrupted(app.state.pool)
+    domain.DEFAULT_REMINDERS["escalation_days"] = settings.escalation_business_days
+    async with app.state.pool.acquire() as con:
+        await listconfig.load(con)
     app.state.import_tasks = set()
     yield
     for task in app.state.import_tasks:
@@ -42,7 +46,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         allow_credentials=False,
     )
-    for r in (accounts, prospects, opportunities, actions, reports, admin, hubspot_import, calendar):
+    for r in (accounts, prospects, opportunities, actions, reports, admin, hubspot_import, calendar, settings_router):
         app.include_router(r.router, prefix="/api")
 
     @app.get("/health", tags=["health"])

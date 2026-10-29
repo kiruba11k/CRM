@@ -18,6 +18,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from loguru import logger
 
+from . import listconfig
 from .config import Settings, get_settings
 
 
@@ -81,11 +82,15 @@ async def current_user(
         email = x_dev_user.strip().lower()
         if not email.endswith("@" + settings.allowed_domain.lower()):
             raise HTTPException(403, f"Only {settings.allowed_domain} accounts can use the CRM.")
-        return await _upsert_user(con, email, "", settings)
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(401, "Sign in with your Google Workspace account.")
-    info = await run_in_threadpool(_verify_google_token, authorization[7:].strip(), settings)
-    return await _upsert_user(con, info["email"], info.get("name", ""), settings)
+        user = await _upsert_user(con, email, "", settings)
+    else:
+        if not authorization or not authorization.lower().startswith("bearer "):
+            raise HTTPException(401, "Sign in with your Google Workspace account.")
+        info = await run_in_threadpool(_verify_google_token, authorization[7:].strip(), settings)
+        user = await _upsert_user(con, info["email"], info.get("name", ""), settings)
+    # Pick up list / reminder changes made by another API instance.
+    await listconfig.ensure_fresh(con, settings.config_refresh_seconds)
+    return user
 
 
 def ensure_can_edit(user: User, owner_id: Optional[str]) -> None:

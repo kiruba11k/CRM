@@ -47,8 +47,12 @@ class Settings(BaseSettings):
     hubspot_token: str = ""
     hubspot_base_url: str = "https://api.hubapi.com"
 
-    # §5.4 manager escalation threshold (business days overdue).
+    # §5.4 manager escalation threshold (business days overdue): the
+    # starting value; admins change it in Settings → Reminders.
     escalation_business_days: int = 3
+    # How often (seconds) each request re-checks for settings changed by
+    # another API instance.
+    config_refresh_seconds: float = 15
 
     @property
     def admin_email_set(self) -> set[str]:

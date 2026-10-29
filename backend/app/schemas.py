@@ -179,8 +179,9 @@ class MeetingIn(_In):
     time_zone: str = "UTC"
     attendees: list[str] = []
     add_meet: bool = True
-    reminder_15: bool = True
-    reminder_day: bool = False
+    # None = the reminder defaults set in Settings → Reminders.
+    reminder_15: Optional[bool] = None
+    reminder_day: Optional[bool] = None
 
 
 class MeetingPatch(_In):

@@ -53,6 +53,13 @@ export function SelectField({ label, value, onChange, options, required, error, 
   )
 }
 
+// Active options plus the record's current value if that option has since
+// been retired in Settings (records keep retired values).
+export function withCurrent(options: string[], value: FormValue): string[] {
+  const v = str(value)
+  return v && !options.includes(v) ? [...options, v] : options
+}
+
 export function OwnerField({ value, onChange, error, label = 'Owner', required = true }: {
   value: FormValue; onChange: (v: string | null) => void; error?: string; label?: string; required?: boolean
 }) {

@@ -125,6 +125,7 @@ function Section({ title, note, tone, items, team, onOpen }: {
               <span className="small" style={{ fontWeight: 600, color: tone.fg }}>{dueText(i)}{team ? ` · ${i.owner_name}` : ''}</span>
             </div>
             {i.escalated && <span className="pill pill-red">Escalated to manager</span>}
+            {i.due_next_business_day && <span className="pill pill-amber">Due next business day</span>}
             <div className="row">
               {i.kind === 'nurture'
                 ? <button type="button" className="btn btn-outline" onClick={() => onOpen(i, 'revisit')}>Revisit now</button>

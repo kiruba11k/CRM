@@ -63,7 +63,8 @@ CLOSED_PROSPECT_STATUSES = {"Disqualified"}
 RISK_RATINGS = ["Unassessed", "Low", "Medium", "High"]
 
 # ── Configurable controlled lists (§2, §4.2). Starting values from the
-# spec; Settings will make these editable once the admin UI lands.
+# spec; admins edit them in Settings (app/listconfig.py keeps these lists
+# in sync with the database, mutating them in place).
 ACCOUNT_STATUSES = ["Target", "Active customer", "Inactive / do not pursue"]
 SOURCES = ["Outbound", "Referral", "Event / tradeshow", "Inbound", "Partner", "Other"]
 NURTURE_REASONS = [
@@ -77,6 +78,54 @@ ROLES = ["salesperson", "manager", "admin"]
 
 # §5.4 manager escalation default (business days overdue)
 ESCALATION_BUSINESS_DAYS = 3
+
+# Lists admins can edit. Each value here is the *active* list (shown in
+# dropdowns); RETIRED holds options hidden from dropdowns that records may
+# still carry, so validation accepts both.
+EDITABLE_LISTS: dict[str, list[str]] = {
+    "sources": SOURCES, "nurture_reasons": NURTURE_REASONS, "lost_reasons": LOST_REASONS,
+    "service_lines": SERVICE_LINES, "account_statuses": ACCOUNT_STATUSES, "currencies": CURRENCIES,
+}
+DEFAULT_LISTS: dict[str, list[str]] = {k: list(v) for k, v in EDITABLE_LISTS.items()}
+RETIRED: dict[str, list[str]] = {k: [] for k in EDITABLE_LISTS}
+# Values the CRM itself relies on (import fallbacks, column defaults).
+PROTECTED: dict[str, set[str]] = {
+    "sources": {"Other"}, "nurture_reasons": {"Other"}, "lost_reasons": {"Other"}, "account_statuses": {"Target"},
+    "service_lines": set(), "currencies": set(),
+}
+DEFAULT_PROBABILITIES: dict[str, int] = dict(STAGES)
+
+# §5 reminder settings (admin-editable). Overdue actions and nurture
+# revisit reminders are required by the spec, so they aren't switches.
+DEFAULT_REMINDERS: dict[str, Any] = {
+    "meeting_15": True,         # default for new meetings
+    "meeting_day": False,       # default for new meetings
+    "due_before": False,        # flag actions due the next business day
+    "escalation": True,         # flag overdue actions to managers
+    "escalation_days": ESCALATION_BUSINESS_DAYS,
+}
+REMINDERS: dict[str, Any] = dict(DEFAULT_REMINDERS)
+
+
+def accepted(key: str) -> list[str]:
+    return EDITABLE_LISTS[key] + RETIRED[key]
+
+
+def apply_config(lists: dict[str, tuple[list[str], list[str]]], probabilities: dict[str, int], reminders: dict[str, Any]) -> None:
+    """Swap in admin-edited values without rebinding the module globals."""
+    for key, (active, retired) in lists.items():
+        EDITABLE_LISTS[key][:] = active
+        RETIRED[key][:] = retired
+    probs = {**DEFAULT_PROBABILITIES, **probabilities}
+    STAGES[:] = [(name, probs[name]) for name, _ in STAGES]
+    STAGE_PROBABILITY.clear()
+    STAGE_PROBABILITY.update(dict(STAGES))
+    REMINDERS.clear()
+    REMINDERS.update({**DEFAULT_REMINDERS, **reminders})
+
+
+def reset_config() -> None:
+    apply_config({k: (list(v), []) for k, v in DEFAULT_LISTS.items()}, {}, {})
 
 
 def stage_index(stage: str) -> int:
@@ -153,7 +202,7 @@ def validate_account(rec: dict) -> tuple[list[Issue], list[Issue]]:
         errors.append({"field": "name", "message": "Account / company name is required."})
     if _blank(rec.get("country")):
         errors.append({"field": "country", "message": "Geography (country) is required."})
-    if rec.get("status") and rec["status"] not in ACCOUNT_STATUSES:
+    if rec.get("status") and rec["status"] not in accepted("account_statuses"):
         errors.append({"field": "status", "message": "Unknown account status."})
     return errors, []
 
@@ -167,7 +216,7 @@ def validate_prospect(rec: dict) -> tuple[list[Issue], list[Issue]]:
         errors.append({"field": "full_name", "message": "Name is required."})
     if status not in PROSPECT_STATUSES:
         errors.append({"field": "status", "message": "Unknown prospect status."})
-    if rec.get("source") and rec["source"] not in SOURCES:
+    if rec.get("source") and rec["source"] not in accepted("sources"):
         errors.append({"field": "source", "message": "Unknown source."})
     if active and not rec.get("owner_id"):
         errors.append({"field": "owner_id", "message": "Owner is required for active prospects."})
@@ -199,14 +248,14 @@ def validate_opportunity(rec: dict, today: Optional[date] = None) -> tuple[list[
     need("account_id", "Account is required.")
     need("owner_id", "Owner is required for every opportunity.")
     need("geography", "Geography is required.")
-    if rec.get("currency") not in CURRENCIES:
+    if rec.get("currency") not in accepted("currencies"):
         errors.append({"field": "currency", "message": "Currency must be one of " + ", ".join(CURRENCIES) + "."})
     for f, allowed, label in (
         ("risk_rating", RISK_RATINGS, "risk rating"),
-        ("service_line", SERVICE_LINES, "service line"),
-        ("deal_source", SOURCES, "deal source"),
-        ("lost_reason", LOST_REASONS, "lost reason"),
-        ("nurture_reason", NURTURE_REASONS, "nurture reason"),
+        ("service_line", accepted("service_lines"), "service line"),
+        ("deal_source", accepted("sources"), "deal source"),
+        ("lost_reason", accepted("lost_reasons"), "lost reason"),
+        ("nurture_reason", accepted("nurture_reasons"), "nurture reason"),
     ):
         if rec.get(f) and rec[f] not in allowed:
             errors.append({"field": f, "message": f"Unknown {label}."})
@@ -292,4 +341,6 @@ def lists_payload() -> dict:
         "service_lines": SERVICE_LINES,
         "currencies": CURRENCIES,
         "roles": ROLES,
+        "retired": {k: list(v) for k, v in RETIRED.items()},
+        "reminders": dict(REMINDERS),
     }

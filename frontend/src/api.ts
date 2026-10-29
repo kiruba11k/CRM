@@ -56,7 +56,7 @@ function parseError(status: number, body: unknown): ApiError {
 }
 
 export type Params = Record<string, string | number | boolean | null | undefined>
-interface RequestOpts { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; body?: unknown; params?: Params }
+interface RequestOpts { method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'; body?: unknown; params?: Params }
 
 // Render's free tier sleeps idle services; the first request after a nap
 // can take ~30-60s while the API wakes, so allow for it before failing.
