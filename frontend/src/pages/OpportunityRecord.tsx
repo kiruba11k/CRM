@@ -4,10 +4,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
-import { money, probabilityOf } from '../format'
+import { money, probabilityOf, domainOf } from '../format'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import { FollowUpStatus, MeetingsCard } from '../components/Meetings'
+import { GmailCard } from '../components/Gmail'
 import type { Account, AccountDetail, FormValue, FormValues, Issue, OpportunityDetail, Prospect } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, TextField, WarningsBanner, changedFields, useLoad, withCurrent } from '../ui'
 
@@ -222,14 +223,9 @@ export default function OpportunityRecord() {
               </Link>
             ))}
           </section>
-          <section className="card" aria-label="Gmail">
-            <h2>Gmail</h2>
-            <span className="muted small">Opens Gmail in context. Emails are not copied into the CRM.</span>
-            {account?.website && <a href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(account.website)}`} target="_blank" rel="noreferrer">Search Gmail for {account.website}</a>}
-            {primary?.email && (
-              <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(primary.email)}`} target="_blank" rel="noreferrer">Compose to {primary.full_name}</a>
-            )}
-          </section>
+          <GmailCard onChange={() => void reload()} entityType="opportunity" entityId={id} canEdit={canEdit} domain={domainOf(account?.website)}
+            emails={primary?.email ? [primary.email] : contacts.map((p) => p.email || '')}
+            subject={account && !data.name.toLowerCase().startsWith(account.name.toLowerCase().split(' ')[0]) ? `${account.name} — ${data.name}` : data.name} />
           <MeetingsCard key={`${data.follow_up?.id}-${data.follow_up?.starts_at}-${data.follow_up?.sync_status}`} entityType="opportunity" entityId={id} />
           <HistoryCard history={data.history} />
         </div>

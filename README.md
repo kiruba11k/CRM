@@ -20,7 +20,7 @@ integration. Staff only (Google Workspace sign-in).
 | 2 | Frontend: My Actions, Prospects, Pipeline, Opportunity/Prospect/Account records, quick create, saved views | **Done** (`frontend/`) |
 | 2b | Frontend: Reports & metrics, Settings (lists, reminders, users & roles, integrations, export & backup, launch checklist), Meetings & booking links, Import from HubSpot | **Done**: Reports, users & roles, CSV export live; Meetings opens a pre-filled Google Calendar event and logs it |
 | 3 | HubSpot import: owners, companies, contacts, deals, associations, notes/calls/meetings/tasks, logged emails; re-runnable; Needs cleanup queue | **Done** (`backend/app/importer.py`) |
-| 4 | Google Calendar + Meet sync per user (create, update, cancel, retry, sync log), shared booking links, Gmail links | **Done** (`backend/app/google_calendar.py`, `routers/calendar.py`) |
+| 4 | Google Calendar + Meet sync per user (create, update, cancel, retry, sync log), follow-up events, shared booking links; Gmail search/compose in context + explicit thread links | **Done** (`backend/app/google_calendar.py`, `routers/calendar.py`) |
 | 5 | Settings: editable controlled lists (add, rename, reorder, retire), stage probabilities, reminder switches + escalation threshold, shared launch checklist, settings change log | **Done** (`backend/app/routers/settings.py`, `app/listconfig.py`) |
 
 ## Layout
@@ -149,6 +149,21 @@ state with a retry.
 Booking links are Google Calendar **appointment schedules** (Google runs
 the booking page, free/busy check and invites); the CRM keeps a shared,
 team-wide list of them.
+
+## Gmail (§6.2)
+
+Account, prospect and opportunity pages have a Gmail card:
+
+- **Search Gmail** for the company's email domain (from its website), or
+  for the record's contacts.
+- **Compose** to the contacts, with a subject that names the account and
+  opportunity.
+- **Linked threads:** a user pastes a Gmail thread link and a label. The
+  CRM keeps only the thread reference, the link, the label and who linked
+  it and when. The link and unlink are logged on the record.
+
+The CRM never reads mail and needs no Gmail permission. A linked thread
+opens for people who already have it in their own Gmail.
 
 ## HubSpot import
 

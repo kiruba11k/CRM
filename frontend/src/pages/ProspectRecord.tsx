@@ -5,8 +5,9 @@ import { ApiError, api } from '../api'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import { FollowUpStatus, MeetingsCard } from '../components/Meetings'
+import { GmailCard } from '../components/Gmail'
 import type { Account, FormValue, FormValues, Issue, Opportunity, ProspectDetail } from '../types'
-import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, changedFields, compact, str, useLoad, withCurrent } from '../ui'
+import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, changedFields, compact, useLoad, withCurrent } from '../ui'
 
 const EDITABLE = ['full_name', 'account_id', 'job_title', 'email', 'phone', 'linkedin_url', 'owner_id', 'status', 'disqualified_reason', 'source', 'next_action_code', 'next_action_other', 'next_action_due', 'next_action_time', 'next_action_time_zone', 'next_action_in_calendar', 'notes'] as const
 
@@ -150,13 +151,8 @@ export default function ProspectRecord() {
               </Link>
             ))}
           </section>
-          {data.email && (
-            <section className="card" aria-label="Gmail">
-              <h2>Gmail</h2>
-              <a href={`https://mail.google.com/mail/u/0/#search/${encodeURIComponent(data.email)}`} target="_blank" rel="noreferrer">Search Gmail for {str(data.email)}</a>
-              <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(data.email)}`} target="_blank" rel="noreferrer">Compose an email</a>
-            </section>
-          )}
+          <GmailCard onChange={() => void reload()} entityType="prospect" entityId={id} canEdit={canEdit} domain={null} emails={data.email ? [data.email] : []}
+            subject={`LeadStrategus × ${accountName || data.full_name}`} />
           <MeetingsCard key={`${data.follow_up?.id}-${data.follow_up?.starts_at}-${data.follow_up?.sync_status}`} entityType="prospect" entityId={id} />
           <HistoryCard history={data.history} />
         </div>

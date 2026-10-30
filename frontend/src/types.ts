@@ -161,3 +161,9 @@ export interface CalendarSyncStatus {
   log: { at: string; action: string; ok: boolean; message: string; meeting_id: string | null; user_name: string | null; meeting_title: string | null }[]
 }
 export interface BookingLink { id: string; owner_id: string; owner_name: string; name: string; url: string; active: boolean; created_at: string }
+
+// Gmail threads a user linked to a record (§6.2): link + label only.
+export interface EmailThread {
+  id: string; entity_type: 'account' | 'prospect' | 'opportunity'; entity_id: string; thread_ref: string
+  url: string; label: string; linked_at: string; linked_by: string | null; linked_by_name: string | null
+}

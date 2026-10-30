@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
-import { fmtDate, money, moneyByCurrency, nextActionLabel, totalsByCurrency } from '../format'
+import { domainOf, fmtDate, money, moneyByCurrency, nextActionLabel, totalsByCurrency } from '../format'
+import { GmailCard } from '../components/Gmail'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import type { AccountDetail, FormValue, FormValues } from '../types'
@@ -117,6 +118,8 @@ export default function AccountRecord() {
             <TextField label="Notes" multiline value={form.notes} onChange={(v) => set('notes', v)} hint="Avoid storing unnecessary sensitive information" />
             {!canEdit && <span className="muted small">Read-only: only the owner, a manager or an admin can edit.</span>}
           </section>
+          <GmailCard onChange={() => void reload()} entityType="account" entityId={id} canEdit={canEdit} domain={domainOf(data.website)}
+            emails={data.prospects.map((p) => p.email || '')} subject={`LeadStrategus × ${data.name}`} />
           <HistoryCard history={data.history} />
         </div>
       </div>

@@ -46,3 +46,9 @@ export function totalsByCurrency<T extends { currency: string }>(rows: T[], valu
   for (const r of rows) out[r.currency] = (out[r.currency] || 0) + Number(value(r) || 0)
   return out
 }
+
+// "https://www.norvale.example/about" → "norvale.example"
+export function domainOf(url: string | null | undefined): string | null {
+  const s = (url || '').trim().toLowerCase().replace(/^[a-z]+:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0]
+  return s && s.includes('.') ? s : null
+}
