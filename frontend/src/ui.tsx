@@ -20,7 +20,7 @@ export function Field({ label, required, error, hint, children, id }: {
 
 interface TextFieldProps {
   label: string; value: FormValue; onChange: (v: string) => void; required?: boolean; error?: string; hint?: string
-  type?: 'text' | 'email' | 'date' | 'search'; maxLength?: number; placeholder?: string; multiline?: boolean
+  type?: 'text' | 'email' | 'date' | 'search' | 'time'; maxLength?: number; placeholder?: string; multiline?: boolean
 }
 export function TextField({ label, value, onChange, required, error, hint, type = 'text', maxLength, placeholder, multiline }: TextFieldProps) {
   const id = useId()
@@ -71,8 +71,12 @@ export function OwnerField({ value, onChange, error, label = 'Owner', required =
 }
 
 // §5.1/§5.2: controlled list + "Other" description (≤ 50 chars) + due date.
-export function NextActionFields<F extends FormValues>({ value, onChange, errors = {}, prefix = 'next_action', withDue = true, required = true, dueLabel = 'Due date' }: {
+const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+export function NextActionFields<F extends FormValues>({ value, onChange, errors = {}, prefix = 'next_action', withDue = true, required = true, dueLabel = 'Due date', withCalendar = false }: {
   value: F; onChange: (v: F) => void; errors?: FieldErrors; prefix?: string; withDue?: boolean; required?: boolean; dueLabel?: string
+  /** §6.1: optional time + "add to my Google Calendar" (next actions only). */
+  withCalendar?: boolean
 }) {
   const { lists } = useSession()
   const code = value[`${prefix}_code`]
@@ -93,6 +97,21 @@ export function NextActionFields<F extends FormValues>({ value, onChange, errors
         <TextField label={dueLabel} type="date" required={required} value={value[`${prefix}_due`]} onChange={(v) => set('due', v || null)}
           error={errors[`${prefix}_due`]} />
       )}
+      {withCalendar && <>
+        <TextField label="Time (optional)" type="time" value={str(value[`${prefix}_time`]).slice(0, 5)} error={errors[`${prefix}_time`]}
+          onChange={(v) => onChange({ ...value, [`${prefix}_time`]: v || null, [`${prefix}_time_zone`]: v ? browserTimeZone : null,
+            ...(v ? {} : { [`${prefix}_in_calendar`]: false }) })}
+          hint={value[`${prefix}_time`] ? `Your time zone: ${str(value[`${prefix}_time_zone`]) || browserTimeZone}` : 'Add a time to put it in your calendar'} />
+        <div className="field">
+          <span className="label-like">Google Calendar</span>
+          <label className="check">
+            <input type="checkbox" checked={!!value[`${prefix}_in_calendar`]} disabled={!value[`${prefix}_time`]}
+              onChange={(e) => onChange({ ...value, [`${prefix}_in_calendar`]: e.target.checked, [`${prefix}_time_zone`]: str(value[`${prefix}_time_zone`]) || browserTimeZone })} />
+            Add to my Google Calendar
+          </label>
+          <span className="hint">Titled “[Account] — [Action]”. Reminders also depend on your own Google notification settings.</span>
+        </div>
+      </>}
     </>
   )
 }

@@ -24,7 +24,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 function ActionPanel({ item, mode, onDone, onCancel }: { item: ActionItem; mode: Mode; onDone: (msg: string) => void; onCancel: () => void }) {
   const { lists } = useSession()
   const [form, setForm] = useState<FormValues>(mode === 'reschedule'
-    ? { next_action_code: item.code, next_action_other: item.other, next_action_due: null }
+    ? { next_action_code: item.code, next_action_other: item.other, next_action_due: null, next_action_time: item.due_time, next_action_in_calendar: item.in_calendar }
     : { next_action_code: null, next_action_other: null, next_action_due: null })
   const [note, setNote] = useState('')
   const [outcome, setOutcome] = useState<Outcome>('reactivate')
@@ -75,7 +75,7 @@ function ActionPanel({ item, mode, onDone, onCancel }: { item: ActionItem; mode:
       )}
       <ErrorBanner error={error} />
       <div className="grid-fields">
-        {(mode !== 'revisit' || outcome === 'reactivate') && <NextActionFields value={form} onChange={setForm} errors={errors} />}
+        {(mode !== 'revisit' || outcome === 'reactivate') && <NextActionFields value={form} onChange={setForm} errors={errors} withCalendar={item.kind !== 'nurture' || outcome === 'reactivate'} />}
         {mode === 'complete' && <TextField label="What happened? (optional)" value={note} onChange={setNote} />}
         {mode === 'revisit' && outcome === 'extend' && (
           <TextField label="New revisit date" type="date" required value={extra.nurture_until} onChange={(v) => setExtra({ ...extra, nurture_until: v || null })} error={errors.nurture_until} />
@@ -95,10 +95,16 @@ function ActionPanel({ item, mode, onDone, onCancel }: { item: ActionItem; mode:
 }
 
 function dueText(i: ActionItem): string {
+  const at = i.due_time ? ` at ${i.due_time.slice(0, 5)}` : ''
+  const cal = i.in_calendar ? ' · in Calendar' : ''
+  return baseDueText(i, at) + cal
+}
+
+function baseDueText(i: ActionItem, at: string): string {
   if (i.kind === 'nurture') return `Revisit ${fmtDate(i.due)}${i.days_until != null ? ` · in ${plural(i.days_until, 'day')}` : ''}`
-  if (i.business_days_overdue !== undefined) return `Due ${fmtDate(i.due)} · ${plural(i.business_days_overdue, 'business day')} overdue`
-  if (i.days_until != null) return `Due ${fmtDate(i.due)} · in ${plural(i.days_until, 'day')}`
-  return 'Due today'
+  if (i.business_days_overdue !== undefined) return `Due ${fmtDate(i.due)}${at} · ${plural(i.business_days_overdue, 'business day')} overdue`
+  if (i.days_until != null) return `Due ${fmtDate(i.due)}${at} · in ${plural(i.days_until, 'day')}`
+  return `Due today${at}`
 }
 
 function Section({ title, note, tone, items, team, onOpen }: {

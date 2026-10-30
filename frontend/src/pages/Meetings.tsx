@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
-import { fmtDateTime } from '../format'
+import { fmtDateTime, nextActionLabel } from '../format'
 import { useSession } from '../session'
 import { SyncPill } from '../components/Meetings'
 import type { BookingLink, CalendarStatus, CalendarSyncStatus, Meeting, Opportunity, Prospect } from '../types'
@@ -33,6 +33,8 @@ function calendarUrl(f: { title: string; when: string; minutes: number; attendee
 }
 
 const splitEmails = (s: string) => s.split(/[\s,;]+/).filter(Boolean)
+// §6.1 suggested title: “[Account] — [Action]” (Other uses its own words).
+const actionTitle = (code: string | null, other: string | null, label: string, otherCode: string) => (code === otherCode ? (other || 'Follow-up') : label || 'Meeting')
 
 function ConnectionBar({ status, onChange }: { status: CalendarStatus; onChange: () => void }) {
   const [error, setError] = useState<ApiError | null>(null)
@@ -71,7 +73,7 @@ function MeetingRow({ m, onChange }: { m: Meeting; onChange: () => void }) {
   return (
     <div className="list-row">
       <span style={{ flex: '1 1 320px', minWidth: 0 }}>
-        <strong>{m.title}</strong><br />
+        <strong>{m.title}</strong>{m.kind === 'follow_up' && <span className="pill pill-blue" style={{ marginLeft: 8 }}>Follow-up</span>}<br />
         <span className="muted small">{fmtDateTime(m.starts_at)} · {m.time_zone}{m.entity_type && m.entity_id ? <> · <Link to={PATH[m.entity_type] + m.entity_id}>{m.entity_name}</Link></> : ''}{m.attendees.length ? ` · ${m.attendees.join(', ')}` : ''}</span>
         {m.sync_error && <><br /><span className="small" style={{ color: 'var(--red-ink)' }}>{m.sync_error}</span></>}
         <ErrorBanner error={error} onClose={() => setError(null)} />
@@ -81,7 +83,7 @@ function MeetingRow({ m, onChange }: { m: Meeting; onChange: () => void }) {
         {m.meet_url && <a className="btn btn-outline" href={m.meet_url} target="_blank" rel="noreferrer">Join Meet</a>}
         {m.html_link && <a className="btn" href={m.html_link} target="_blank" rel="noreferrer">Open in Calendar</a>}
         {mine && ['failed', 'not_connected', 'pending'].includes(m.sync_status) && <button type="button" className="btn btn-outline" disabled={busy} onClick={() => act('retry')}>Retry sync</button>}
-        {mine && <button type="button" className="btn" disabled={busy} onClick={() => act('cancel')}>Cancel</button>}
+        {mine && <button type="button" className="btn" disabled={busy} onClick={() => act('cancel')}>{m.kind === 'follow_up' ? 'Remove from Calendar' : 'Cancel'}</button>}
       </span>
     </div>
   )
@@ -117,10 +119,10 @@ function ScheduleTab({ status, reloadStatus }: { status: CalendarStatus; reloadS
     if (kind === 'prospect') {
       const p = prospects.data?.find((x) => x.id === id)
       if (p?.email && !attendees) setAttendees(p.email)
-      if (p && !title) setTitle(`LeadStrategus × ${p.account_name || p.full_name}`)
+      if (p && !title) setTitle(`${p.account_name || p.full_name} — ${actionTitle(p.next_action_code, p.next_action_other, nextActionLabel(lists, p.next_action_code, p.next_action_other), lists.other_code)}`)
     } else {
       const o = opps.data?.find((x) => x.id === id)
-      if (o && !title) setTitle(`LeadStrategus × ${o.account_name}: ${o.name}`)
+      if (o && !title) setTitle(`${o.account_name} — ${actionTitle(o.next_action_code, o.next_action_other, nextActionLabel(lists, o.next_action_code, o.next_action_other), lists.other_code)}`)
     }
   }
   // A record passed in the link (from a record page) prefills once loaded.
@@ -199,6 +201,8 @@ function ScheduleTab({ status, reloadStatus }: { status: CalendarStatus; reloadS
           <li>It’s then created in your own Google Calendar, invites go to attendees, and the Meet link comes back here.</li>
           <li>The CRM keeps the Google event ID, so changing or cancelling the meeting updates that same event. It never adds a duplicate.</li>
           <li>A sync counts as done only once Google confirms it. Failures stay on the meeting with a retry, and appear under Calendar sync status.</li>
+          <li>A next action with a time can go into your calendar too: tick “Add to my Google Calendar” on the record. Rescheduling moves that event; completing or closing removes it.</li>
+          <li>The CRM sets each event’s reminders, but whether and how you are notified also depends on your own Google Calendar notification settings.</li>
         </ul>
       </section>
     </div>

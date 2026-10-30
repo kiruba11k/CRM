@@ -286,3 +286,111 @@ def test_booking_links_are_shared(client):
     assert client.c.delete(f"/api/booking-links/{link['id']}", headers={"X-Dev-User": REP2}).status_code == 403
     assert client.patch(f"/api/booking-links/{link['id']}", {"active": False}, as_=REP).json()["active"] is False
     assert client.c.delete(f"/api/booking-links/{link['id']}", headers={"X-Dev-User": ADMIN}).json() == {"ok": True}
+
+
+# ── §6.1 time-specific follow-ups ─────────────────────────────────────
+
+def follow_up(client, path, as_=REP):
+    return client.get(path, as_=as_).json()["follow_up"]
+
+
+def test_follow_up_follows_the_next_action(client, google):
+    connect(client, google, REP)
+    opp = make_opp(client)
+    path = f"/api/opportunities/{opp['id']}"
+    r = client.patch(path, {"next_action_in_calendar": True}, as_=REP)
+    assert r.status_code == 422 and "Add a time" in r.text
+    assert client.patch(path, {"next_action_time": "15:00", "next_action_time_zone": "Europe/London", "next_action_in_calendar": True}, as_=REP).status_code == 200
+    fu = follow_up(client, path)
+    assert fu["sync_status"] == "synced" and fu["title"] == "Norvale Pharma — Schedule meeting"
+    ev = google.events[fu["google_event_id"]]
+    assert ev["start"] == {"dateTime": "2030-01-01T15:00:00+00:00", "timeZone": "Europe/London"}
+    assert "Opportunity: Norvale · LinkedIn (Lead identified)" in ev["description"] and "Owner: rep" in ev["description"]
+    assert "Next action: Schedule meeting · due 1 Jan 2030" in ev["description"] and "sign-in required" in ev["description"]
+    meeting = client.get(f"/api/meetings/{fu['id']}", as_=REP).json()
+    assert meeting["calendar_id"] == REP and meeting["kind"] == "follow_up"
+
+    # Reschedule and reword: the same event changes, no second one.
+    client.patch(path, {"next_action_due": "2030-01-03"}, as_=REP)
+    r = client.post(f"{path}/complete-action", {"next_action_code": "07", "next_action_due": "2030-01-05", "next_action_time": "09:30",
+                                                "next_action_time_zone": "Europe/London", "next_action_in_calendar": True}, as_=REP)
+    assert r.status_code == 200, r.text
+    fu2 = follow_up(client, path)
+    assert fu2["id"] == fu["id"] and len(google.events) == 1
+    assert google.events[fu["google_event_id"]]["summary"] == "Norvale Pharma — Prepare / send proposal"
+    assert google.events[fu["google_event_id"]]["start"]["dateTime"] == "2030-01-05T09:30:00+00:00"
+    assert [c[0] for c in google.calls] == ["POST", "PATCH", "PATCH"]
+
+    # Next action without a calendar slot: the event is cancelled.
+    client.post(f"{path}/complete-action", {"next_action_code": "08", "next_action_due": "2030-01-09"}, as_=REP)
+    assert follow_up(client, path) is None and google.events[fu["google_event_id"]]["status"] == "cancelled"
+
+    # Closing the record cancels a live follow-up too.
+    client.patch(path, {"next_action_time": "10:00", "next_action_in_calendar": True}, as_=REP)
+    fu3 = follow_up(client, path)
+    assert fu3["sync_status"] == "synced" and fu3["id"] != fu["id"]
+    client.patch(path, {"stage": "Lost", "lost_reason": "Budget", "lost_date": "2026-10-30"}, as_=REP)
+    assert follow_up(client, path) is None and google.events[fu3["google_event_id"]]["status"] == "cancelled"
+
+
+def test_follow_up_moves_with_the_owner(client, google):
+    connect(client, google, REP)
+    connect(client, google, REP2)
+    opp = make_opp(client)
+    path = f"/api/opportunities/{opp['id']}"
+    client.patch(path, {"next_action_time": "15:00", "next_action_in_calendar": True}, as_=REP)
+    old = follow_up(client, path)
+    assert client.patch(path, {"owner_id": client.ids[REP2]}, as_=MANAGER).status_code == 200
+    new = follow_up(client, path, as_=REP2)
+    assert new["id"] != old["id"] and new["sync_status"] == "synced"
+    assert google.events[old["google_event_id"]]["status"] == "cancelled"
+    assert client.get(f"/api/meetings/{new['id']}", as_=REP2).json()["calendar_id"] == REP2
+
+
+def test_past_follow_up_is_kept_as_history(client, google):
+    connect(client, google, REP)
+    opp = make_opp(client)
+    path = f"/api/opportunities/{opp['id']}"
+    client.patch(path, {"next_action_due": "2026-10-01", "next_action_time": "10:00", "next_action_in_calendar": True}, as_=REP)
+    past = follow_up(client, path)
+    client.post(f"{path}/complete-action", {"next_action_code": "07", "next_action_due": "2030-02-01", "next_action_time": "11:00", "next_action_in_calendar": True}, as_=REP)
+    now = follow_up(client, path)
+    assert now["id"] != past["id"] and len(google.events) == 2
+    assert google.events[past["google_event_id"]]["status"] == "confirmed"
+
+
+def test_prospect_follow_up_and_failures_never_block_saving(client, google):
+    p = client.post("/api/prospects", {"full_name": "Sofia Lind", "email": "sofia@norvale.example", "next_action_code": "01",
+                                       "next_action_due": "2030-01-02", "next_action_time": "14:00", "next_action_in_calendar": True}, as_=REP)
+    assert p.status_code == 201, p.text
+    fu = follow_up(client, f"/api/prospects/{p.json()['id']}")
+    assert fu["title"] == "Sofia Lind — Call prospect" and fu["sync_status"] == "not_connected"
+    connect(client, google, REP)  # waiting follow-ups go out on connect
+    assert follow_up(client, f"/api/prospects/{p.json()['id']}")["sync_status"] == "synced"
+    actions = client.get("/api/actions", params={"as_of": "2029-12-31"}, as_=REP).json()
+    item = next(i for i in actions["upcoming"] if i["title"] == "Sofia Lind")
+    assert item["due_time"] == "14:00:00" and item["in_calendar"] is True
+
+
+def test_follow_up_is_driven_by_the_record(client, google):
+    connect(client, google, REP)
+    opp = make_opp(client)
+    path = f"/api/opportunities/{opp['id']}"
+    client.patch(path, {"next_action_time": "15:00", "next_action_in_calendar": True}, as_=REP)
+    fu = follow_up(client, path)
+    assert client.patch(f"/api/meetings/{fu['id']}", {"title": "x"}, as_=REP).status_code == 409
+    assert client.post(f"/api/meetings/{fu['id']}/cancel", {}, as_=REP).json()["sync_status"] == "cancelled"
+    rec = client.get(path, as_=REP).json()
+    assert rec["next_action_in_calendar"] is False and rec["follow_up"] is None
+
+
+def test_meeting_default_title_and_description(client, google):
+    connect(client, google, REP)
+    opp = make_opp(client)
+    m = client.post("/api/meetings", {"entity_type": "opportunity", "entity_id": opp["id"], "starts_at": "2030-01-15T14:30:00+00:00",
+                                      "description": "Bring the Q1 plan."}, as_=REP).json()
+    assert m["title"] == "Norvale Pharma — Schedule meeting"
+    desc = google.events[m["google_event_id"]]["description"]
+    assert desc.index("Opportunity:") < desc.index("Notes:\nBring the Q1 plan.") < desc.index("Open in LeadStrategus CRM")
+    r = client.post("/api/meetings", {"starts_at": "2030-01-15T14:30:00+00:00"}, as_=REP)
+    assert r.status_code == 422 and "[Account] — [Action]" in r.text

@@ -72,31 +72,34 @@ async def sync_meeting(con: asyncpg.Connection, google: gc.Google, settings: Set
         return await _meeting(con, meeting_id)
 
     link = f"{settings.app_url}/{_PATH[m['entity_type']]}/{m['entity_id']}" if m["entity_type"] else None
+    context, _ = await record_context(con, m["entity_type"], m["entity_id"])
+    # The calendar the event lives in; a user's primary calendar ID is their email.
+    calendar_id = m["calendar_id"] or conn["google_email"]
     try:
         refresh = gc.decrypt(settings.token_key, conn["refresh_token_encrypted"])
         if m["cancelled"]:
             if m["google_event_id"]:
-                await google.delete_event(refresh, m["google_event_id"])
+                await google.delete_event(refresh, calendar_id, m["google_event_id"])
             await con.execute("UPDATE meetings SET sync_status = 'cancelled', sync_error = NULL, synced_at = now() WHERE id = $1", meeting_id)
             message = "Cancelled in Google Calendar; attendees notified." if m["google_event_id"] else "Cancelled (was never in Google Calendar)."
         else:
             if m["google_event_id"]:
-                event = await google.patch_event(refresh, m["google_event_id"], gc.event_body(m, link, with_id=False))
+                event = await google.patch_event(refresh, calendar_id, m["google_event_id"], gc.event_body(m, link, False, context))
                 message = f"Updated Google Calendar event {event['id']}."
             else:
                 try:
-                    event = await google.insert_event(refresh, gc.event_body(m, link, with_id=True))
+                    event = await google.insert_event(refresh, calendar_id, gc.event_body(m, link, True, context))
                     message = f"Created Google Calendar event {event['id']}."
                 except gc.CalendarError as e:
                     if e.status != 409:
                         raise
                     # An earlier attempt did create it (e.g. the reply was lost): update that one.
-                    event = await google.patch_event(refresh, gc.event_id_for(str(meeting_id)), gc.event_body(m, link, with_id=False))
+                    event = await google.patch_event(refresh, calendar_id, gc.event_id_for(str(meeting_id)), gc.event_body(m, link, False, context))
                     message = f"Found the event from an earlier attempt and updated it ({event['id']})."
             await con.execute(
-                "UPDATE meetings SET google_event_id = $2, html_link = $3, meet_url = coalesce($4, meet_url), "
+                "UPDATE meetings SET google_event_id = $2, html_link = $3, meet_url = coalesce($4, meet_url), calendar_id = $5, "
                 "sync_status = 'synced', sync_error = NULL, synced_at = now() WHERE id = $1",
-                meeting_id, event["id"], event.get("htmlLink"), gc.meet_link(event))
+                meeting_id, event["id"], event.get("htmlLink"), gc.meet_link(event), calendar_id)
         await con.execute("UPDATE calendar_connections SET last_sync_at = now(), last_error = NULL WHERE user_id = $1", m["owner_id"])
         await _log(con, meeting_id, m["owner_id"], action, True, message)
     except gc.CalendarError as e:
@@ -106,6 +109,46 @@ async def sync_meeting(con: asyncpg.Connection, google: gc.Google, settings: Set
             m["owner_id"], e.message, e.reconnect)
         await _log(con, meeting_id, m["owner_id"], action, False, e.message)
     return await _meeting(con, meeting_id)
+
+
+async def record_context(con: asyncpg.Connection, entity_type: Optional[str], entity_id: Optional[UUID]) -> tuple[list[str], Optional[str]]:
+    """Description lines for the linked record, and the name used as
+    “[Account]” in default titles."""
+    if entity_type == "opportunity":
+        r = await con.fetchrow(
+            "SELECT o.name, o.stage, o.next_action_code, o.next_action_other, o.next_action_due, a.name AS account, u.name AS owner "
+            "FROM opportunities o JOIN accounts a ON a.id = o.account_id LEFT JOIN users u ON u.id = o.owner_id WHERE o.id = $1", entity_id)
+        if r is None:
+            return [], None
+        lines = [f"Opportunity: {r['name']} ({r['stage']})", f"Account: {r['account']}", f"Owner: {r['owner'] or 'Unassigned'}"]
+        account = r["account"]
+    elif entity_type == "prospect":
+        r = await con.fetchrow(
+            "SELECT p.full_name, p.status, p.next_action_code, p.next_action_other, p.next_action_due, a.name AS account, u.name AS owner "
+            "FROM prospects p LEFT JOIN accounts a ON a.id = p.account_id LEFT JOIN users u ON u.id = p.owner_id WHERE p.id = $1", entity_id)
+        if r is None:
+            return [], None
+        lines = [f"Prospect: {r['full_name']} ({r['status']})"] + ([f"Account: {r['account']}"] if r["account"] else []) + [f"Owner: {r['owner'] or 'Unassigned'}"]
+        account = r["account"] or r["full_name"]
+    elif entity_type == "account":
+        r = await con.fetchrow("SELECT a.name, u.name AS owner FROM accounts a LEFT JOIN users u ON u.id = a.owner_id WHERE a.id = $1", entity_id)
+        return ([f"Account: {r['name']}", f"Owner: {r['owner'] or 'Unassigned'}"], r["name"]) if r else ([], None)
+    else:
+        return [], None
+    if r["next_action_code"]:
+        due = f" · due {r['next_action_due'].strftime('%-d %b %Y')}" if r["next_action_due"] else ""
+        lines.append(f"Next action: {domain.next_action_label(r['next_action_code'], r['next_action_other'])}{due}")
+    return lines, account
+
+
+async def default_title(con: asyncpg.Connection, entity_type: str, entity_id: UUID, action: Optional[str] = None) -> str:
+    """§6.1 suggested title: “[Account] — [Action]”."""
+    _, account = await record_context(con, entity_type, entity_id)
+    if action is None:
+        table, _ = _TABLE[entity_type]
+        row = await con.fetchrow(f"SELECT next_action_code, next_action_other FROM {table} WHERE id = $1", entity_id) if entity_type != "account" else None
+        action = domain.next_action_title(row["next_action_code"], row["next_action_other"]) if row and row["next_action_code"] else "Meeting"
+    return f"{account or 'LeadStrategus'} — {action}"
 
 
 async def _meeting(con: asyncpg.Connection, meeting_id: UUID) -> dict:
@@ -208,7 +251,7 @@ async def sync_status(con: asyncpg.Connection = Depends(get_con), user: User = D
 def _check_meeting(rec: dict) -> list[dict]:
     errors = []
     if not (rec.get("title") or "").strip():
-        errors.append({"field": "title", "message": "Meeting title is required."})
+        errors.append({"field": "title", "message": "Meeting title is required (or link a record to use “[Account] — [Action]”)."})
     if rec.get("starts_at") is None:
         errors.append({"field": "starts_at", "message": "Date and time are required."})
     elif rec["starts_at"].tzinfo is None:
@@ -245,11 +288,13 @@ async def create_meeting(body: MeetingIn, request: Request, con: asyncpg.Connect
         if rec[k] is None:
             rec[k] = bool(domain.REMINDERS[setting])
     rec["attendees"] = list(dict.fromkeys(a.strip().lower() for a in rec["attendees"] if a.strip()))
-    raise_if_errors(_check_meeting(rec))
-    if rec["entity_type"]:
+    if rec["entity_type"] and rec["entity_id"]:
         table, _ = _TABLE[rec["entity_type"]]
         if not await con.fetchval(f"SELECT 1 FROM {table} WHERE id = $1", rec["entity_id"]):
             raise_if_errors([{"field": "entity_id", "message": "The linked record no longer exists."}])
+        if not (rec["title"] or "").strip():
+            rec["title"] = await default_title(con, rec["entity_type"], rec["entity_id"])
+    raise_if_errors(_check_meeting(rec))
     google = _google(request, settings) if not settings.calendar_missing else None
     starts = rec["starts_at"]
     async with con.transaction():
@@ -293,6 +338,8 @@ async def update_meeting(meeting_id: UUID, body: MeetingPatch, request: Request,
     _can_change(user, m)
     if m["cancelled"]:
         raise HTTPException(409, "This meeting was cancelled. Schedule a new one instead.")
+    if m["kind"] == "follow_up":
+        raise HTTPException(409, "This is the calendar event for a next action: change its date or time on the record instead.")
     patch = body.model_dump(exclude_unset=True)
     if "attendees" in patch:
         patch["attendees"] = list(dict.fromkeys(a.strip().lower() for a in patch["attendees"] or [] if a.strip()))
@@ -323,7 +370,10 @@ async def cancel_meeting(meeting_id: UUID, request: Request, con: asyncpg.Connec
     _can_change(user, m)
     if m["cancelled"]:
         return m
-    await con.execute("UPDATE meetings SET cancelled = true, updated_at = now() WHERE id = $1", meeting_id)
+    await con.execute("UPDATE meetings SET cancelled = true, follow_up_active = false, updated_at = now() WHERE id = $1", meeting_id)
+    if m["kind"] == "follow_up" and m["entity_type"] in ("prospect", "opportunity"):
+        # Keep the record in step: its next action is no longer in the calendar.
+        await con.execute(f"UPDATE {_TABLE[m['entity_type']][0]} SET next_action_in_calendar = false WHERE id = $1", m["entity_id"])
     if m["entity_type"]:
         await log_activity(con, m["entity_type"], m["entity_id"], "meeting", f"Meeting cancelled: {m['title']} · {_when(m)}", user.id)
     if settings.calendar_missing:

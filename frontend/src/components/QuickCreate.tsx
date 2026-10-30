@@ -56,7 +56,7 @@ function ProspectForm({ form, set, setForm, errors, accounts }: FormProps) {
       <TextField label="Email" type="email" value={form.email} onChange={(v) => set('email', v)} error={errors.email} hint="At least one contact route is recommended" />
       <OwnerField value={form.owner_id} onChange={(v) => set('owner_id', v)} error={errors.owner_id} />
       <SelectField label="Status" value={form.status} onChange={(v) => set('status', v)} options={lists.prospect_statuses} />
-      <NextActionFields value={form} onChange={setForm} errors={errors} />
+      <NextActionFields value={form} onChange={setForm} errors={errors} withCalendar />
     </div>
   )
 }
@@ -77,7 +77,7 @@ function OpportunityForm({ form, set, setForm, errors, accounts }: FormProps) {
         <SelectField label="Currency" required value={form.currency} onChange={(v) => set('currency', v)} options={lists.currencies} />
         <SelectField label="Risk rating" required value={form.risk_rating} onChange={(v) => set('risk_rating', v)} options={lists.risk_ratings} error={errors.risk_rating} />
       </>}
-      <NextActionFields value={form} onChange={setForm} errors={errors} />
+      <NextActionFields value={form} onChange={setForm} errors={errors} withCalendar />
     </div>
   )
 }

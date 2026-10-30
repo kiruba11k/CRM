@@ -1,9 +1,10 @@
 // Meeting bits shared by the Meetings page and record pages.
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api'
+import { ApiError, api } from '../api'
 import { fmtDateTime } from '../format'
-import type { Meeting, SyncState } from '../types'
-import { useLoad } from '../ui'
+import type { FollowUp, Meeting, SyncState } from '../types'
+import { ErrorBanner, useLoad } from '../ui'
 
 const SYNC: Record<SyncState, { label: string; pill: string }> = {
   synced: { label: 'In Google Calendar', pill: 'teal' },
@@ -27,7 +28,7 @@ export function MeetingsCard({ entityType, entityId }: { entityType: 'prospect' 
       {(data || []).map((m) => (
         <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <strong>{m.title}</strong>
-          <span className="small muted">{fmtDateTime(m.starts_at)} · {m.owner_name}</span>
+          <span className="small muted">{m.kind === 'follow_up' ? 'Follow-up · ' : ''}{fmtDateTime(m.starts_at)} · {m.owner_name}</span>
           <span className="row" style={{ gap: 8 }}>
             <SyncPill state={m.sync_status} />
             {m.meet_url && <a className="small" href={m.meet_url} target="_blank" rel="noreferrer">Join Meet</a>}
@@ -35,5 +36,29 @@ export function MeetingsCard({ entityType, entityId }: { entityType: 'prospect' 
         </div>
       ))}
     </section>
+  )
+}
+
+// The calendar event behind a next action with a time (§6.1): its sync
+// state, the Google link once confirmed, and a retry when it failed.
+export function FollowUpStatus({ followUp, onChange }: { followUp: FollowUp | null; onChange: () => void }) {
+  const [error, setError] = useState<ApiError | null>(null)
+  const [busy, setBusy] = useState(false)
+  if (!followUp) return null
+  const retry = () => {
+    setBusy(true)
+    api(`/meetings/${followUp.id}/retry`, { method: 'POST' }).then(onChange).catch((e: ApiError) => setError(e)).finally(() => setBusy(false))
+  }
+  return (
+    <div className="row" style={{ gap: 8 }} aria-label="Calendar follow-up">
+      <SyncPill state={followUp.sync_status} />
+      <span className="small muted">{followUp.title} · {fmtDateTime(followUp.starts_at)}</span>
+      {followUp.html_link && <a className="small" href={followUp.html_link} target="_blank" rel="noreferrer">Open in Calendar</a>}
+      {['failed', 'not_connected', 'pending'].includes(followUp.sync_status) && (
+        <button type="button" className="btn btn-outline" disabled={busy} onClick={retry}>Retry sync</button>
+      )}
+      {followUp.sync_error && <span className="small" style={{ color: 'var(--red-ink)', flexBasis: '100%' }}>{followUp.sync_error}</span>}
+      <ErrorBanner error={error} onClose={() => setError(null)} />
+    </div>
   )
 }

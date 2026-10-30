@@ -7,7 +7,7 @@ import { ApiError, api } from '../api'
 import { money, probabilityOf } from '../format'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
-import { MeetingsCard } from '../components/Meetings'
+import { FollowUpStatus, MeetingsCard } from '../components/Meetings'
 import type { Account, AccountDetail, FormValue, FormValues, Issue, OpportunityDetail, Prospect } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, TextField, WarningsBanner, changedFields, useLoad, withCurrent } from '../ui'
 
@@ -15,6 +15,7 @@ const EDITABLE = [
   'name', 'account_id', 'primary_contact_id', 'owner_id', 'stage', 'estimated_value', 'currency', 'expected_close', 'geography',
   'service_line', 'deal_source', 'risk_rating', 'high_risk_reason', 'risk_mitigation', 'on_nurture', 'nurture_reason', 'nurture_until',
   'nurture_owner_id', 'nurture_next_action_code', 'nurture_next_action_other', 'next_action_code', 'next_action_other', 'next_action_due',
+  'next_action_time', 'next_action_time_zone', 'next_action_in_calendar',
   'proposal_due', 'delivery_lead', 'effort_estimate', 'actual_value', 'won_date', 'lost_date', 'lost_reason', 'lost_notes',
 ] as const
 type Teams = { database_build_team: string[]; proposal_team: string[] }
@@ -125,7 +126,10 @@ export default function OpportunityRecord() {
             <div className="card-head"><h2>Next action</h2><span className="muted small">Same 18-option list as prospects</span></div>
             {closed ? <p className="muted" style={{ margin: 0 }}>Closed: open-deal reminders have stopped.</p>
               : nurtured ? <p className="muted" style={{ margin: 0 }}>On nurture: routine reminders are paused. The nurture next action below drives the revisit reminder.</p>
-              : <div className="grid-fields"><NextActionFields value={form} onChange={setForm} errors={errors} /></div>}
+              : <>
+                  <div className="grid-fields"><NextActionFields value={form} onChange={setForm} errors={errors} withCalendar /></div>
+                  <FollowUpStatus followUp={data.follow_up} onChange={() => void reload()} />
+                </>}
           </section>
 
           <section className="card" aria-label="Opportunity">
@@ -226,7 +230,7 @@ export default function OpportunityRecord() {
               <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(primary.email)}`} target="_blank" rel="noreferrer">Compose to {primary.full_name}</a>
             )}
           </section>
-          <MeetingsCard entityType="opportunity" entityId={id} />
+          <MeetingsCard key={`${data.follow_up?.id}-${data.follow_up?.starts_at}-${data.follow_up?.sync_status}`} entityType="opportunity" entityId={id} />
           <HistoryCard history={data.history} />
         </div>
       </div>

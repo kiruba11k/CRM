@@ -4,11 +4,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
-import { MeetingsCard } from '../components/Meetings'
+import { FollowUpStatus, MeetingsCard } from '../components/Meetings'
 import type { Account, FormValue, FormValues, Issue, Opportunity, ProspectDetail } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, changedFields, compact, str, useLoad, withCurrent } from '../ui'
 
-const EDITABLE = ['full_name', 'account_id', 'job_title', 'email', 'phone', 'linkedin_url', 'owner_id', 'status', 'disqualified_reason', 'source', 'next_action_code', 'next_action_other', 'next_action_due', 'notes'] as const
+const EDITABLE = ['full_name', 'account_id', 'job_title', 'email', 'phone', 'linkedin_url', 'owner_id', 'status', 'disqualified_reason', 'source', 'next_action_code', 'next_action_other', 'next_action_due', 'next_action_time', 'next_action_time_zone', 'next_action_in_calendar', 'notes'] as const
 
 function ConvertPanel({ prospect, accountName, accounts, onCancel }: { prospect: ProspectDetail; accountName?: string; accounts: Account[]; onCancel: () => void }) {
   const { lists } = useSession()
@@ -114,7 +114,10 @@ export default function ProspectRecord() {
           <section className="card strong" aria-label="Next action">
             <div className="card-head"><h2>Next action</h2><span className="muted small">Same list as opportunities</span></div>
             {closed ? <p className="muted" style={{ margin: 0 }}>Disqualified: no reminders.</p> : (
-              <div className="grid-fields"><NextActionFields value={form} onChange={setForm} errors={errors} /></div>
+              <>
+                <div className="grid-fields"><NextActionFields value={form} onChange={setForm} errors={errors} withCalendar /></div>
+                <FollowUpStatus followUp={data.follow_up} onChange={() => void reload()} />
+              </>
             )}
           </section>
           <section className="card" aria-label="Details">
@@ -154,7 +157,7 @@ export default function ProspectRecord() {
               <a href={`https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(data.email)}`} target="_blank" rel="noreferrer">Compose an email</a>
             </section>
           )}
-          <MeetingsCard entityType="prospect" entityId={id} />
+          <MeetingsCard key={`${data.follow_up?.id}-${data.follow_up?.starts_at}-${data.follow_up?.sync_status}`} entityType="prospect" entityId={id} />
           <HistoryCard history={data.history} />
         </div>
       </div>

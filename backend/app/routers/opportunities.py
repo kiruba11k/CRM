@@ -4,9 +4,9 @@ from typing import Optional
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .. import domain
+from .. import domain, followups
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
 from ..records import activities, get_or_404, history, insert, log_activity, raise_if_errors, record_changes, update
 from ..schemas import CompleteActionIn, NoteIn, OpportunityIn, OpportunityPatch, RevisitIn
@@ -99,9 +99,11 @@ async def list_opportunities(
 
 
 @router.post("", status_code=201)
-async def create_opportunity(body: OpportunityIn, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+async def create_opportunity(body: OpportunityIn, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
     async with con.transaction():
-        return await create_opportunity_record(con, body.model_dump(), user)
+        result = await create_opportunity_record(con, body.model_dump(), user)
+    await followups.reconcile(request, con, "opportunity", result["id"])
+    return result
 
 
 @router.get("/{opp_id}")
@@ -111,6 +113,7 @@ async def get_opportunity(opp_id: UUID, con: asyncpg.Connection = Depends(get_co
     return {
         **_with_derived(row),
         **(await _teams(con, opp_id)),
+        "follow_up": await followups.current(con, "opportunity", opp_id),
         "warnings": warnings,
         "activities": await activities(con, [("opportunity", opp_id)]),
         "history": await history(con, "opportunity", opp_id),
@@ -123,7 +126,7 @@ async def _apply_update(con: asyncpg.Connection, opp_id: UUID, before: dict, pat
     if merged.get("on_nurture") and not merged.get("nurture_owner_id"):
         patch["nurture_owner_id"] = merged["nurture_owner_id"] = merged["owner_id"]
     normalised = domain.normalise_closed_opportunity(merged)
-    for f in ("next_action_code", "next_action_other", "next_action_due"):
+    for f in (*domain.NEXT_ACTION_FIELDS, "next_action_in_calendar"):
         if normalised[f] != merged[f]:
             patch[f] = normalised[f]
     errors, warnings = domain.validate_opportunity(normalised)
@@ -141,7 +144,7 @@ async def _apply_update(con: asyncpg.Connection, opp_id: UUID, before: dict, pat
 
 @router.patch("/{opp_id}")
 async def update_opportunity(
-    opp_id: UUID, body: OpportunityPatch, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
+    opp_id: UUID, body: OpportunityPatch, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
 ):
     before = await get_or_404(con, "opportunities", opp_id, "Opportunity")
     ensure_can_edit(user, before["owner_id"])
@@ -152,12 +155,14 @@ async def update_opportunity(
         if not await con.fetchval("SELECT 1 FROM accounts WHERE id = $1", patch["account_id"]):
             raise HTTPException(422, {"message": "Fix the highlighted fields before saving.", "errors": [{"field": "account_id", "message": "Account not found."}]})
     async with con.transaction():
-        return await _apply_update(con, opp_id, before, patch, user)
+        result = await _apply_update(con, opp_id, before, patch, user)
+    await followups.reconcile(request, con, "opportunity", opp_id)
+    return result
 
 
 @router.post("/{opp_id}/complete-action")
 async def complete_action(
-    opp_id: UUID, body: CompleteActionIn, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
+    opp_id: UUID, body: CompleteActionIn, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
 ):
     before = await get_or_404(con, "opportunities", opp_id, "Opportunity")
     ensure_can_edit(user, before["owner_id"])
@@ -168,14 +173,14 @@ async def complete_action(
     done = domain.next_action_label(before["next_action_code"], before["next_action_other"]) or "Action"
     async with con.transaction():
         await log_activity(con, "opportunity", opp_id, "action_completed", f"Completed: {done}" + (f". {body.note}" if body.note else ""), user.id)
-        return await _apply_update(con, opp_id, before, {
-            "next_action_code": body.next_action_code, "next_action_other": body.next_action_other, "next_action_due": body.next_action_due,
-        }, user)
+        result = await _apply_update(con, opp_id, before, body.model_dump(exclude={"note"}), user)
+    await followups.reconcile(request, con, "opportunity", opp_id)
+    return result
 
 
 @router.post("/{opp_id}/revisit")
 async def revisit_nurture(
-    opp_id: UUID, body: RevisitIn, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
+    opp_id: UUID, body: RevisitIn, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
 ):
     """§4.2: at revisit, reactivate, extend nurture, or mark Lost."""
     before = await get_or_404(con, "opportunities", opp_id, "Opportunity")
@@ -183,7 +188,7 @@ async def revisit_nurture(
     if not before["on_nurture"]:
         raise HTTPException(409, "This opportunity is not on nurture.")
     if body.outcome == "reactivate":
-        patch = {"on_nurture": False, "next_action_code": body.next_action_code, "next_action_other": body.next_action_other, "next_action_due": body.next_action_due}
+        patch = {"on_nurture": False, **body.model_dump(include={*domain.NEXT_ACTION_FIELDS, "next_action_in_calendar"})}
     elif body.outcome == "extend":
         patch = {"nurture_until": body.nurture_until}
         if body.next_action_code:
@@ -191,7 +196,9 @@ async def revisit_nurture(
     else:
         patch = {"on_nurture": False, "stage": domain.LOST, "lost_reason": body.lost_reason, "lost_notes": body.lost_notes, "lost_date": body.lost_date or date.today()}
     async with con.transaction():
-        return await _apply_update(con, opp_id, before, patch, user)
+        result = await _apply_update(con, opp_id, before, patch, user)
+    await followups.reconcile(request, con, "opportunity", opp_id)
+    return result
 
 
 @router.post("/{opp_id}/activities", status_code=201)

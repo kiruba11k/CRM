@@ -9,7 +9,7 @@ Required *values* are left Optional on purpose: domain.py reports a
 missing name or account in the same plain words as every other rule,
 instead of a generic "Field required".
 """
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Literal, Optional
 from uuid import UUID
@@ -57,6 +57,9 @@ class _ProspectFields(_In):
     next_action_code: Optional[str] = None
     next_action_other: Optional[str] = None
     next_action_due: Optional[date] = None
+    next_action_time: Optional[time] = None
+    next_action_time_zone: Optional[str] = None
+    next_action_in_calendar: bool = False
     notes: Optional[str] = None
 
 
@@ -88,6 +91,9 @@ class _OpportunityFields(_In):
     next_action_code: Optional[str] = None
     next_action_other: Optional[str] = None
     next_action_due: Optional[date] = None
+    next_action_time: Optional[time] = None
+    next_action_time_zone: Optional[str] = None
+    next_action_in_calendar: bool = False
     proposal_due: Optional[date] = None
     delivery_lead: Optional[str] = None
     effort_estimate: Optional[str] = None
@@ -134,6 +140,9 @@ class ConvertProspectIn(_In):
     next_action_code: Optional[str] = None
     next_action_other: Optional[str] = None
     next_action_due: Optional[date] = None
+    next_action_time: Optional[time] = None
+    next_action_time_zone: Optional[str] = None
+    next_action_in_calendar: bool = False
 
 
 class CompleteActionIn(_In):
@@ -144,6 +153,9 @@ class CompleteActionIn(_In):
     next_action_code: Optional[str] = None
     next_action_other: Optional[str] = None
     next_action_due: Optional[date] = None
+    next_action_time: Optional[time] = None
+    next_action_time_zone: Optional[str] = None
+    next_action_in_calendar: bool = False
 
 
 class RevisitIn(_In):
@@ -152,6 +164,9 @@ class RevisitIn(_In):
     next_action_code: Optional[str] = None
     next_action_other: Optional[str] = None
     next_action_due: Optional[date] = None
+    next_action_time: Optional[time] = None
+    next_action_time_zone: Optional[str] = None
+    next_action_in_calendar: bool = False
     nurture_until: Optional[date] = None
     lost_reason: Optional[str] = None
     lost_notes: Optional[str] = None

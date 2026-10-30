@@ -16,10 +16,10 @@ from fastapi import HTTPException
 # Fields whose changes are written to record_history (§8.3).
 TRACKED_FIELDS = {
     "account": ["name", "owner_id", "status", "country"],
-    "prospect": ["status", "owner_id", "account_id", "next_action_code", "next_action_due"],
+    "prospect": ["status", "owner_id", "account_id", "next_action_code", "next_action_due", "next_action_time", "next_action_in_calendar"],
     "opportunity": [
         "stage", "owner_id", "estimated_value", "currency", "expected_close", "risk_rating",
-        "on_nurture", "nurture_until", "next_action_code", "next_action_due", "actual_value", "lost_reason",
+        "on_nurture", "nurture_until", "next_action_code", "next_action_due", "next_action_time", "next_action_in_calendar", "actual_value", "lost_reason",
     ],
 }
 

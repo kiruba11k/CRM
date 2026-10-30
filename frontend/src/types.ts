@@ -50,6 +50,7 @@ export interface Prospect {
   id: string; full_name: string; account_id: string | null; job_title: string | null; email: string | null; phone: string | null
   linkedin_url: string | null; owner_id: string | null; status: string; disqualified_reason: string | null; source: string | null
   next_action_code: string | null; next_action_other: string | null; next_action_due: string | null; notes: string | null
+  next_action_time: string | null; next_action_time_zone: string | null; next_action_in_calendar: boolean
   account_name?: string | null; geography?: string | null; owner_name?: string | null; created_at?: string
 }
 
@@ -60,6 +61,7 @@ export interface Opportunity {
   on_nurture: boolean; nurture_reason: string | null; nurture_until: string | null; nurture_owner_id: string | null
   nurture_next_action_code: string | null; nurture_next_action_other: string | null
   next_action_code: string | null; next_action_other: string | null; next_action_due: string | null
+  next_action_time: string | null; next_action_time_zone: string | null; next_action_in_calendar: boolean
   proposal_due: string | null; delivery_lead: string | null; effort_estimate: string | null
   actual_value: Money; won_date: string | null; lost_date: string | null; lost_reason: string | null; lost_notes: string | null
   probability: number; weighted_value: Money; next_action_label: string
@@ -69,12 +71,18 @@ export interface Opportunity {
 export interface OpportunityDetail extends Opportunity {
   database_build_team: { id: string; name: string }[]
   proposal_team: { id: string; name: string }[]
-  warnings: Issue[]; activities: Activity[]; history: HistoryEntry[]
+  warnings: Issue[]; activities: Activity[]; history: HistoryEntry[]; follow_up: FollowUp | null
+}
+
+// The calendar event kept for a next action with a time (§6.1).
+export interface FollowUp {
+  id: string; title: string; starts_at: string; time_zone: string; sync_status: SyncState; sync_error: string | null
+  html_link: string | null; google_event_id: string | null
 }
 
 export interface ProspectDetail extends Prospect {
   opportunities: Pick<Opportunity, 'id' | 'name' | 'stage' | 'estimated_value' | 'currency' | 'on_nurture'>[]
-  activities: Activity[]; history: HistoryEntry[]
+  activities: Activity[]; history: HistoryEntry[]; follow_up: FollowUp | null
 }
 
 export interface AccountDetail extends Account {
@@ -86,6 +94,7 @@ export interface ActionItem {
   kind: ActionKind; id: string; title: string; account_name: string | null; owner_id: string | null; owner_name: string | null
   code: string | null; other: string | null; due: string; nurture_reason: string | null; label: string
   days_until?: number | null; business_days_overdue?: number; escalated?: boolean; due_next_business_day?: boolean
+  due_time: string | null; in_calendar: boolean
 }
 export interface ActionsResponse {
   as_of: string; scope: 'me' | 'team'
@@ -140,6 +149,7 @@ export interface Meeting {
   attendees: string[]; add_meet: boolean; reminder_15: boolean; reminder_day: boolean
   google_event_id: string | null; html_link: string | null; meet_url: string | null
   sync_status: SyncState; sync_error: string | null; synced_at: string | null; cancelled: boolean
+  kind: 'meeting' | 'follow_up'; calendar_id: string | null
 }
 export interface CalendarStatus {
   configured: boolean; missing: string[]; connected: boolean

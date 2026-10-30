@@ -13,7 +13,7 @@ import hmac
 import json
 import time
 from typing import Optional
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
@@ -21,7 +21,12 @@ from cryptography.fernet import Fernet, InvalidToken
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 REVOKE_URL = "https://oauth2.googleapis.com/revoke"
-EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+CALENDAR_API = "https://www.googleapis.com/calendar/v3/calendars"
+
+
+def events_url(calendar_id: str) -> str:
+    """A user's primary calendar ID is their own email address."""
+    return f"{CALENDAR_API}/{quote(calendar_id, safe='')}/events"
 SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.events"]
 STATE_TTL = 600
 
@@ -163,15 +168,15 @@ class Google:
             raise CalendarError(f"Google Calendar returned {resp.status_code}: {_google_message(resp)}", resp.status_code)
         return resp.json() if resp.content else None
 
-    async def insert_event(self, refresh_token: str, body: dict) -> dict:
-        return await self._call(refresh_token, "POST", EVENTS_URL, params={"conferenceDataVersion": 1, "sendUpdates": "all"}, json=body)
+    async def insert_event(self, refresh_token: str, calendar_id: str, body: dict) -> dict:
+        return await self._call(refresh_token, "POST", events_url(calendar_id), params={"conferenceDataVersion": 1, "sendUpdates": "all"}, json=body)
 
-    async def patch_event(self, refresh_token: str, event_id: str, body: dict) -> dict:
-        return await self._call(refresh_token, "PATCH", f"{EVENTS_URL}/{event_id}", params={"conferenceDataVersion": 1, "sendUpdates": "all"}, json=body)
+    async def patch_event(self, refresh_token: str, calendar_id: str, event_id: str, body: dict) -> dict:
+        return await self._call(refresh_token, "PATCH", f"{events_url(calendar_id)}/{event_id}", params={"conferenceDataVersion": 1, "sendUpdates": "all"}, json=body)
 
-    async def delete_event(self, refresh_token: str, event_id: str) -> None:
+    async def delete_event(self, refresh_token: str, calendar_id: str, event_id: str) -> None:
         try:
-            await self._call(refresh_token, "DELETE", f"{EVENTS_URL}/{event_id}", params={"sendUpdates": "all"})
+            await self._call(refresh_token, "DELETE", f"{events_url(calendar_id)}/{event_id}", params={"sendUpdates": "all"})
         except CalendarError as e:
             if e.status not in (404, 410):  # already gone counts as cancelled
                 raise
@@ -182,13 +187,24 @@ def event_id_for(meeting_id: str) -> str:
     return meeting_id.replace("-", "")
 
 
-def event_body(m: dict, link: Optional[str], with_id: bool) -> dict:
+def event_description(context: list[str], notes: Optional[str], link: Optional[str]) -> str:
+    """§6.1: opportunity (or prospect), owner, notes and a CRM record link.
+    The link only opens for signed-in CRM users, so it reveals nothing."""
+    parts = []
+    if context:
+        parts.append("\n".join(context))
+    if notes and notes.strip():
+        parts.append("Notes:\n" + notes.strip())
+    if link:
+        parts.append(f"Open in LeadStrategus CRM (sign-in required): {link}")
+    return "\n\n".join(parts)
+
+
+def event_body(m: dict, link: Optional[str], with_id: bool, context: Optional[list[str]] = None) -> dict:
     reminders = [{"method": "popup", "minutes": 15}] if m["reminder_15"] else []
     if m["reminder_day"]:
         reminders.append({"method": "popup", "minutes": 24 * 60})
-    description = m.get("description") or ""
-    if link:
-        description = f"{description}\n\nLeadStrategus CRM: {link}".strip()
+    description = event_description(context or [], m.get("description"), link)
     body = {
         "summary": m["title"],
         "description": description,

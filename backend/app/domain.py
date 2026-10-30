@@ -196,6 +196,24 @@ def _check_next_action(
             errors.append({"field": due_f, "message": f"{label} due date is required."})
 
 
+def _check_follow_up(rec: dict, errors: list[Issue], open_action: bool) -> None:
+    """§6.1: a next action with a time can go into the owner's calendar."""
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    if not open_action:
+        return
+    if rec.get("next_action_time") and not rec.get("next_action_due"):
+        errors.append({"field": "next_action_time", "message": "Set the due date before adding a time."})
+    if rec.get("next_action_in_calendar") and not rec.get("next_action_time"):
+        errors.append({"field": "next_action_time", "message": "Add a time to put this follow-up in your calendar."})
+    tz = rec.get("next_action_time_zone")
+    if tz:
+        try:
+            ZoneInfo(tz)
+        except (ZoneInfoNotFoundError, ValueError):
+            errors.append({"field": "next_action_time_zone", "message": "Unknown time zone."})
+
+
 def validate_account(rec: dict) -> tuple[list[Issue], list[Issue]]:
     errors: list[Issue] = []
     if _blank(rec.get("name")):
@@ -221,6 +239,7 @@ def validate_prospect(rec: dict) -> tuple[list[Issue], list[Issue]]:
     if active and not rec.get("owner_id"):
         errors.append({"field": "owner_id", "message": "Owner is required for active prospects."})
     _check_next_action(rec, "next_action_code", "next_action_other", "next_action_due", active, errors, "Next action")
+    _check_follow_up(rec, errors, active)
     if active and all(_blank(rec.get(k)) for k in ("email", "phone", "linkedin_url")):
         warnings.append({"field": "email", "message": "Add at least one contact route (email, phone or LinkedIn) before active outreach."})
     if not rec.get("account_id"):
@@ -295,6 +314,7 @@ def validate_opportunity(rec: dict, today: Optional[date] = None) -> tuple[list[
         _check_next_action(rec, "nurture_next_action_code", "nurture_next_action_other", None, False, errors, "Nurture next action")
 
     _check_next_action(rec, "next_action_code", "next_action_other", "next_action_due", not closed and not nurtured, errors, "Next action")
+    _check_follow_up(rec, errors, not closed and not nurtured)
 
     # Review prompts (§4.1): flag, never overwrite the human-set rating.
     if idx >= stage_index("Qualified") and not closed and not rec.get("primary_contact_id"):
@@ -308,11 +328,21 @@ def validate_opportunity(rec: dict, today: Optional[date] = None) -> tuple[list[
     return errors, warnings
 
 
+NEXT_ACTION_FIELDS = ("next_action_code", "next_action_other", "next_action_due", "next_action_time", "next_action_time_zone")
+
+
+def next_action_title(code: Optional[str], other: Optional[str]) -> str:
+    """The action part of “[Account] — [Action]”: Other's own words, else the label."""
+    if code == OTHER_CODE:
+        return (other or "").strip() or "Follow-up"
+    return NEXT_ACTIONS.get(code or "", "") or "Follow-up"
+
+
 def normalise_closed_opportunity(rec: dict) -> dict:
     """§5.3: Won/Lost records stop open-record reminders, so clear the
     open next action on closure (history keeps what it was)."""
     if rec.get("stage") in CLOSED_STAGES:
-        rec = {**rec, "next_action_code": None, "next_action_other": None, "next_action_due": None}
+        rec = {**rec, **{f: None for f in NEXT_ACTION_FIELDS}, "next_action_in_calendar": False}
     return rec
 
 

@@ -171,3 +171,4 @@ td .sub { font-size: 12px; color: var(--ink-soft); }
 .side-list { display: flex; flex-direction: column; gap: 2px; }
 .side-list button { text-align: left; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 0; background: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .side-list button[aria-pressed="true"] { background: var(--paper-deep); font-weight: 700; }
+.label-like { font-weight: 600; font-size: 13px; }

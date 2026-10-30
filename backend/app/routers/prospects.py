@@ -3,9 +3,9 @@ from typing import Literal, Optional
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .. import domain
+from .. import domain, followups
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
 from ..records import activities, get_or_404, history, insert, log_activity, raise_if_errors, record_changes, update
 from ..schemas import CompleteActionIn, ConvertProspectIn, NoteIn, ProspectIn, ProspectPatch
@@ -49,7 +49,7 @@ async def _save_or_conflict(coro):
 
 
 @router.post("", status_code=201)
-async def create_prospect(body: ProspectIn, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+async def create_prospect(body: ProspectIn, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
     data = body.model_dump()
     if data["status"] not in domain.CLOSED_PROSPECT_STATUSES:
         data["owner_id"] = data["owner_id"] or UUID(user.id)
@@ -59,6 +59,7 @@ async def create_prospect(body: ProspectIn, con: asyncpg.Connection = Depends(ge
     async with con.transaction():
         row = await _save_or_conflict(insert(con, "prospects", data))
         await record_changes(con, "prospect", row["id"], None, row, user.id)
+    await followups.reconcile(request, con, "prospect", row["id"])
     return {**row, "warnings": warnings}
 
 
@@ -71,6 +72,7 @@ async def get_prospect(prospect_id: UUID, con: asyncpg.Connection = Depends(get_
     )]
     return {
         **p,
+        "follow_up": await followups.current(con, "prospect", prospect_id),
         "opportunities": opps,
         "activities": await activities(con, [("prospect", prospect_id)]),
         "history": await history(con, "prospect", prospect_id),
@@ -79,7 +81,7 @@ async def get_prospect(prospect_id: UUID, con: asyncpg.Connection = Depends(get_
 
 @router.patch("/{prospect_id}")
 async def update_prospect(
-    prospect_id: UUID, body: ProspectPatch, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
+    prospect_id: UUID, body: ProspectPatch, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
 ):
     before = await get_or_404(con, "prospects", prospect_id, "Prospect")
     ensure_can_edit(user, before["owner_id"])
@@ -89,8 +91,9 @@ async def update_prospect(
     merged = {**before, **patch}
     if merged.get("status") in domain.CLOSED_PROSPECT_STATUSES:
         # Disqualified prospects get no open-record reminders (§5.3).
-        for f in ("next_action_code", "next_action_other", "next_action_due"):
+        for f in domain.NEXT_ACTION_FIELDS:
             patch[f] = merged[f] = None
+        patch["next_action_in_calendar"] = merged["next_action_in_calendar"] = False
     errors, warnings = domain.validate_prospect(merged)
     raise_if_errors(errors)
     async with con.transaction():
@@ -98,18 +101,19 @@ async def update_prospect(
         await record_changes(con, "prospect", prospect_id, before, row, user.id)
         if before["status"] != row["status"]:
             await log_activity(con, "prospect", prospect_id, "status_change", f"Status: {before['status']} → {row['status']}", user.id)
+    await followups.reconcile(request, con, "prospect", prospect_id)
     return {**row, "warnings": warnings}
 
 
 @router.post("/{prospect_id}/complete-action")
 async def complete_action(
-    prospect_id: UUID, body: CompleteActionIn, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
+    prospect_id: UUID, body: CompleteActionIn, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
 ):
     before = await get_or_404(con, "prospects", prospect_id, "Prospect")
     ensure_can_edit(user, before["owner_id"])
     if before["status"] in domain.CLOSED_PROSPECT_STATUSES:
         raise HTTPException(409, "This prospect is closed. Reopen it before adding a next action.")
-    patch = {"next_action_code": body.next_action_code, "next_action_other": body.next_action_other, "next_action_due": body.next_action_due}
+    patch = body.model_dump(exclude={"note"})
     merged = {**before, **patch}
     errors, _ = domain.validate_prospect(merged)
     raise_if_errors(errors)
@@ -120,6 +124,7 @@ async def complete_action(
         patch["last_activity_at"] = await con.fetchval("SELECT now()")
         row = await update(con, "prospects", prospect_id, patch)
         await record_changes(con, "prospect", prospect_id, before, row, user.id)
+    await followups.reconcile(request, con, "prospect", prospect_id)
     return row
 
 
@@ -134,7 +139,7 @@ async def add_note(prospect_id: UUID, body: NoteIn, con: asyncpg.Connection = De
 
 @router.post("/{prospect_id}/convert", status_code=201)
 async def convert_to_opportunity(
-    prospect_id: UUID, body: ConvertProspectIn, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
+    prospect_id: UUID, body: ConvertProspectIn, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
 ):
     """§2.4 / §9 prospect lifecycle: a qualified pursuit becomes an
     opportunity without losing contact history. The prospect stays as the
@@ -156,4 +161,5 @@ async def convert_to_opportunity(
         row = await update(con, "prospects", prospect_id, p_patch)
         await record_changes(con, "prospect", prospect_id, p, row, user.id)
         await log_activity(con, "prospect", prospect_id, "converted", f"Opportunity created: {opp['name']}", user.id)
+    await followups.reconcile(request, con, "opportunity", opp["id"])
     return opp

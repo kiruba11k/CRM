@@ -130,6 +130,22 @@ API is free within its usage quotas):
 Until these are set, the Meetings page still works: it opens a pre-filled
 Google Calendar event and logs the meeting on the record.
 
+**Events (§6.1).** Titles default to “[Account] — [Action]”. Descriptions
+list the opportunity (or prospect), stage, owner, next action and notes,
+plus a link to the CRM record that only opens for signed-in CRM users. Each
+event stores its Google event ID and calendar ID. The CRM sets popup
+reminders; whether people see them also depends on their own Google
+notification settings.
+
+**Follow-ups.** A next action can have a time and **Add to my Google
+Calendar**. The record then keeps one 15-minute follow-up event in the
+owner's calendar. Rescheduling or rewording the action updates that event.
+Changing the owner moves it to the new owner's calendar. Completing the
+action, unticking the option, closing or nurturing the record cancels it.
+A follow-up whose time has passed stays in the calendar as history. The
+record is always saved, even if Google fails; the follow-up shows its sync
+state with a retry.
+
 Booking links are Google Calendar **appointment schedules** (Google runs
 the booking page, free/busy check and invites); the CRM keeps a shared,
 team-wide list of them.

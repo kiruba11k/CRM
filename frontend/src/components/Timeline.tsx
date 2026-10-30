@@ -9,7 +9,7 @@ import { ErrorBanner, SelectField, TextField } from '../ui'
 const FIELD_LABEL: Record<string, string> = {
   stage: 'Stage', owner_id: 'Owner', estimated_value: 'Estimated value', currency: 'Currency', expected_close: 'Expected close',
   risk_rating: 'Risk rating', on_nurture: 'On nurture', nurture_until: 'Nurture until', next_action_code: 'Next action',
-  next_action_due: 'Next action due', actual_value: 'Actual value', lost_reason: 'Lost reason', status: 'Status',
+  next_action_due: 'Next action due', next_action_time: 'Next action time', next_action_in_calendar: 'In Google Calendar', actual_value: 'Actual value', lost_reason: 'Lost reason', status: 'Status',
   account_id: 'Account', name: 'Name', country: 'Country',
 }
 type NoteKind = 'note' | 'call' | 'meeting' | 'email'
