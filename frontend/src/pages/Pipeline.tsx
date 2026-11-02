@@ -117,7 +117,7 @@ export default function Pipeline() {
                   onDragOver={(e) => onDragOver(e, name)} onDrop={(e) => onDrop(e, name)}
                   onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver((s) => (s === name ? null : s)) }}>
                   <div className="column-bar" style={{ background: STAGE_COLOR[name] }} />
-                  <div className="column-head"><span>{name} <span className="muted">{cards.length}</span></span><span className="mono muted">{probability}%</span></div>
+                  <div className="column-head"><span><span className="stage-dot" style={{ background: STAGE_COLOR[name] }} />{name} <span className="muted">{cards.length}</span></span><span className="mono muted">{probability}%</span></div>
                   <div className="column-cards">
                     {cards.map((o) => {
                       const overdue = !closed && !o.on_nurture && !!o.next_action_due && o.next_action_due < today
@@ -128,10 +128,13 @@ export default function Pipeline() {
                           className={`deal-card${o.on_nurture ? ' nurture' : o.risk_rating === 'High' ? ' risk-high' : ''}${dragId === o.id ? ' dragging' : ''}${landed === o.id ? ' landed' : ''}`}>
                           <span className="small muted" style={{ fontWeight: 600 }}>{o.account_name}</span>
                           <span className="title">{o.name}</span>
-                          <span className="mono" style={{ fontWeight: 600 }}>{money(o.estimated_value, o.currency)}</span>
-                          <div className="row" style={{ gap: 6 }}><RiskPill risk={o.risk_rating} />{o.on_nurture && <span className="pill pill-purple">On nurture</span>}</div>
-                          <span className="small muted">Close {fmtDate(o.expected_close)} · {o.owner_name}</span>
-                          <span className="small" style={{ borderTop: '1px solid var(--line-soft)', paddingTop: 6, fontWeight: 600, color: overdue ? 'var(--red-ink)' : undefined }}>
+                          <div className="row" style={{ gap: 6, justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 800 }}>{money(o.estimated_value, o.currency)}</span>
+                            <span className="row" style={{ gap: 6 }}>{o.on_nurture && <span className="pill pill-purple">Nurture</span>}<RiskPill risk={o.risk_rating} /></span>
+                          </div>
+                          <span className="small muted">Close {fmtDate(o.expected_close)}</span>
+                          <span className="deal-foot" style={{ color: overdue ? 'var(--red-ink)' : 'var(--ink-soft)' }}>
+                            <span className="avatar" title={o.owner_name || 'Unassigned'} aria-label={`Owner: ${o.owner_name || 'Unassigned'}`}>{(o.owner_name || '?').split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}</span>
                             {cardFooter(o, closed, overdue)}
                           </span>
                         </Link>

@@ -18,11 +18,28 @@ import Settings from './pages/Settings'
 import Import from './pages/Import'
 import Cleanup from './pages/Cleanup'
 
-const NAV: [string, [string, string][]][] = [
-  ['Daily work', [['/', 'My Actions'], ['/prospects', 'Prospects'], ['/pipeline', 'Pipeline'], ['/accounts', 'Accounts']]],
-  ['Views & reporting', [['/views', 'Forecast & views'], ['/reports', 'Reports'], ['/cleanup', 'Needs cleanup']]],
-  ['Google & admin', [['/meetings', 'Meetings & booking'], ['/settings', 'Settings'], ['/import', 'Import from HubSpot']]],
+// Icon rail: [path, full name (tooltip + screen readers), short label, icon path].
+type NavItem = [string, string, string, string]
+const NAV: NavItem[][] = [
+  [
+    ['/', 'My Actions', 'Actions', 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
+    ['/prospects', 'Prospects', 'Prospects', 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'],
+    ['/pipeline', 'Pipeline', 'Pipeline', 'M4 4h4v16H4zM10 4h4v10h-4zM16 4h4v6h-4z'],
+    ['/accounts', 'Accounts', 'Accounts', 'M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6'],
+  ],
+  [
+    ['/views', 'Forecast & views', 'Forecast', 'M3 3v18h18M7 15l4-4 3 3 5-6'],
+    ['/reports', 'Reports', 'Reports', 'M4 20V10M10 20V4M16 20v-8M22 20H2'],
+    ['/cleanup', 'Needs cleanup', 'Cleanup', 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0'],
+  ],
+  [
+    ['/meetings', 'Meetings & booking', 'Meetings', 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2'],
+    ['/settings', 'Settings', 'Settings', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4'],
+    ['/import', 'Import from HubSpot', 'Import', 'M12 3v12M7 10l5 5 5-5M5 21h14'],
+  ],
 ]
+
+const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('') || '?'
 
 function Login() {
   const { signIn, error } = useSessionState()
@@ -50,7 +67,7 @@ function Login() {
   return (
     <div className="login">
       <div className="card strong">
-        <div className="nav-brand" style={{ padding: 0, color: 'var(--ink)' }}>LeadStrategus <span className="nav-chip" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>CRM</span></div>
+        <div className="row" style={{ gap: 12 }}><span className="rail-brand" style={{ margin: 0 }}>LS</span><strong style={{ fontSize: 20 }}>LeadStrategus CRM</strong></div>
         <p className="muted" style={{ margin: 0 }}>Sign in with your LeadStrategus Google Workspace account.</p>
         {error && <Banner kind="err">{error}</Banner>}
         {gsiError && <Banner kind="err">{gsiError}</Banner>}
@@ -72,28 +89,32 @@ export default function App() {
   const { user } = session
   return (
     <div className="shell">
-      <nav className="nav" aria-label="Main">
-        <div className="nav-brand">LeadStrategus <span className="nav-chip">CRM</span></div>
-        {NAV.map(([group, links]) => (
-          <div key={group}>
-            <div className="nav-group-title">{group}</div>
-            <div className="nav-links">
-              {links.map(([to, label]) => <NavLink key={to} to={to} end={to === '/'}>{label}</NavLink>)}
-            </div>
+      <nav className="rail" aria-label="Main">
+        <NavLink to="/" className="rail-brand" aria-label="LeadStrategus CRM home" title="LeadStrategus CRM">LS</NavLink>
+        {NAV.map((group, gi) => (
+          <div key={gi} style={{ display: 'contents' }}>
+            {gi > 0 && <span className="rail-sep" aria-hidden="true" />}
+            {group.map(([to, label, short, icon]) => (
+              <NavLink key={to} to={to} end={to === '/'} className="rail-link" title={label} aria-label={label}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={icon} /></svg>
+                <span aria-hidden="true">{short}</span>
+              </NavLink>
+            ))}
           </div>
         ))}
-        <div className="nav-foot">
-          <span>{user.name} · {user.role}{DEV_USER ? ' (dev sign-in)' : ''}</span>
+        <div className="rail-foot">
+          <span className="avatar" title={`${user.name} · ${user.role}${DEV_USER ? ' (dev sign-in)' : ''}`}>{initials(user.name)}</span>
           <button type="button" onClick={session.signOut}>Sign out</button>
         </div>
       </nav>
       <main className="main">
         <div className="topbar">
-          <span className="muted small">Every active prospect and open opportunity needs an owner, a next action and a due date.</span>
+          <span className="who"><span className="avatar">{initials(user.name)}</span><span>{user.name}<span className="muted small" style={{ fontWeight: 600 }}> · {user.role}{DEV_USER ? ' (dev sign-in)' : ''}</span></span></span>
           <div className="row">
-            {(['account', 'prospect', 'opportunity'] as const).map((t) => (
-              <button key={t} type="button" className="btn btn-outline" onClick={() => setQuick(t)}>+ {t[0].toUpperCase() + t.slice(1)}</button>
+            {(['account', 'prospect'] as const).map((t) => (
+              <button key={t} type="button" className="btn" onClick={() => setQuick(t)}>+ {t[0].toUpperCase() + t.slice(1)}</button>
             ))}
+            <button type="button" className="btn btn-primary" onClick={() => setQuick('opportunity')}>+ New deal</button>
           </div>
         </div>
         <div className="page-enter" key={location.pathname}>
