@@ -12,8 +12,9 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 
-from .. import domain, listconfig
+from .. import demo, domain, listconfig
 from ..auth import User, current_user, get_con, require_admin
+from ..config import Settings, get_settings
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -304,3 +305,32 @@ async def update_checklist(item_key: str, body: ChecklistPatch, con: asyncpg.Con
         if "done" in patch:
             await _audit(con, "Launch checklist", f"{'Ticked' if patch['done'] else 'Unticked'} “{name}”.", user)
     return await _checklist(con)
+
+
+# ── Demo data (admin) ─────────────────────────────────────────────────
+
+class DemoIn(_In):
+    action: str
+
+
+@router.get("/demo")
+async def demo_status(con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+    return {"loaded": await demo.is_loaded(con)}
+
+
+@router.post("/demo")
+async def demo_data(body: DemoIn, con: asyncpg.Connection = Depends(get_con), settings: Settings = Depends(get_settings),
+                    user: User = Depends(require_admin)):
+    """Load or remove the dummy dataset (fixed IDs: removal never touches real records)."""
+    if body.action == "load":
+        try:
+            counts = await demo.load(con, settings.allowed_domain)
+        except ValueError as e:
+            raise HTTPException(409, str(e)) from e
+        await _audit(con, "Demo data", "Loaded demo data: " + ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in counts.items()) + ".", user)
+        return {"loaded": True, "counts": counts}
+    if body.action == "remove":
+        result = await demo.remove(con)
+        await _audit(con, "Demo data", "Removed demo data." + (f" Kept (still used by real records): {', '.join(result['kept'])}." if result["kept"] else ""), user)
+        return {"loaded": False, **result}
+    raise HTTPException(422, "Action must be load or remove.")

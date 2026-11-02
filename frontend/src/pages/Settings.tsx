@@ -362,12 +362,57 @@ function IntegrationsTab() {
 
 const EXPORTS = [['accounts', 'Accounts'], ['prospects', 'Prospects / contacts'], ['opportunities', 'Opportunities'], ['history', 'Change history (audit)']] as const
 
+// Dummy data for trying the CRM out (admin). Fixed IDs on the server mean
+// "Remove" deletes exactly the demo records and never real ones.
+function DemoCard() {
+  const { refreshUsers } = useSession()
+  const status = useLoad(() => api<{ loaded: boolean }>('/settings/demo'), [])
+  const [error, setError] = useState<ApiError | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const run = (action: 'load' | 'remove') => {
+    if (action === 'remove' && !window.confirm('Remove all demo data? Real records are not touched.')) return
+    setBusy(true)
+    setError(null)
+    setMsg('')
+    api<{ counts?: Record<string, number>; kept?: string[] }>('/settings/demo', { method: 'POST', body: { action } })
+      .then((r) => {
+        setMsg(action === 'load'
+          ? `Loaded ${Object.entries(r.counts || {}).map(([k, v]) => `${v} ${k.replace('_', ' ')}`).join(', ')}.`
+          : `Demo data removed.${r.kept?.length ? ` Kept because real records use them: ${r.kept.join(', ')}.` : ''}`)
+        void status.reload()
+        void refreshUsers()
+      })
+      .catch((e: ApiError) => setError(e)).finally(() => setBusy(false))
+  }
+  const loaded = status.data?.loaded
+  return (
+    <section className="card" aria-label="Demo data">
+      <div className="card-head"><h2>Demo data</h2>{status.data && <span className={`pill pill-${loaded ? 'amber' : 'grey'}`}>{loaded ? 'Loaded' : 'Not loaded'}</span>}</div>
+      <p className="muted small" style={{ margin: 0 }}>
+        Fills every screen to try the CRM out: 4 demo users (names end “(demo)”), 12 accounts, 25 prospects, 18 opportunities across all stages,
+        nurture, won and lost deals in USD, EUR and GBP, activity timelines, meetings, booking links, Gmail thread links and two “Needs cleanup” records.
+        Dates are set around today. Demo records belong to the demo users, so nothing is sent to anyone’s Google Calendar or Tasks.
+      </p>
+      <ErrorBanner error={error || status.error} onClose={() => setError(null)} />
+      {msg && <Banner onClose={() => setMsg('')}>{msg}</Banner>}
+      <div className="row">
+        <button type="button" className="btn btn-dark" disabled={busy || loaded !== false} onClick={() => run('load')}>Load demo data</button>
+        <button type="button" className="btn" disabled={busy || !loaded} onClick={() => run('remove')}>Remove demo data</button>
+      </div>
+      <span className="muted small">Remove deletes only the demo records. Remove it before going live.</span>
+    </section>
+  )
+}
+
 function DataTab() {
   const { user } = useSession()
   const [error, setError] = useState<ApiError | null>(null)
   const [done, setDone] = useState('')
   const can = user.role !== 'salesperson'
   return (
+    <>
+    {user.role === 'admin' && <DemoCard />}
     <div className="cols">
       <section className="card col-main" aria-label="CSV export">
         <h2>CSV export</h2>
@@ -390,6 +435,7 @@ function DataTab() {
         <p className="muted small" style={{ margin: 0 }}>Kept for every record: stage changes, nurture on/off, risk rating, owner, value, close date, conversions from prospect to opportunity, and who made each change.</p>
       </section>
     </div>
+    </>
   )
 }
 

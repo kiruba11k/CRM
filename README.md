@@ -35,7 +35,9 @@ backend/
   app/importer.py      HubSpot → CRM mapping and the import run
   app/google_calendar.py  per-user Google OAuth + Calendar events (encrypted refresh tokens)
   app/listconfig.py    keeps domain.py's editable lists / probabilities / reminders in sync with the DB
-  scripts/seed_demo.py sample data for a local dev database
+  scripts/seed_demo.py sample data for a local dev database (through the API)
+  scripts/demo_data.py load/remove the full demo dataset (same as Settings → Demo data)
+  app/demo.py          the demo dataset
   tests/               rule tests (no DB) + API tests (real Postgres)
 frontend/
   src/types.ts         TypeScript types for every API response
@@ -82,6 +84,36 @@ The test database's `public` schema is dropped and recreated. Without
 `CRM_TEST_DATABASE_URL` only the pure rule tests run. CI runs both
 (`.github/workflows/backend-tests.yml`), and type-checks and builds the
 frontend (`.github/workflows/frontend-checks.yml`).
+
+## Demo data
+
+To try the CRM out, an admin opens **Settings → Export & backup → Demo
+data → Load demo data**. It adds:
+
+- 4 demo users (names end "(demo)", emails `demo.*@` your domain)
+- 12 accounts and 25 prospects (3 not linked to an account)
+- 18 opportunities covering all nine stages, two on nurture, won and lost
+  deals, High risk, and USD, EUR and GBP
+- team assignments, activity timelines and stage history
+- 6 meetings, 2 booking links, 3 Gmail thread links
+- 2 "Needs cleanup" records
+
+Dates are set around the load day, so My Actions shows overdue, today and
+upcoming work. Every demo record belongs to a demo user, so nothing is sent
+to anyone's Google Calendar or Tasks.
+
+**Remove demo data** deletes exactly those records: they have fixed IDs.
+Real records that were linked to demo ones are unlinked, not deleted.
+Remove it before going live.
+
+From the command line (the API must have started once against the
+database):
+
+```bash
+cd backend
+python scripts/demo_data.py load   --database-url "postgresql://…"
+python scripts/demo_data.py remove --database-url "postgresql://…"
+```
 
 ## How the spec maps to the code
 
