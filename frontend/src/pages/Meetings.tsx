@@ -9,7 +9,7 @@ import { ApiError, api } from '../api'
 import { fmtDateTime, nextActionLabel } from '../format'
 import { useSession } from '../session'
 import { SyncPill } from '../components/Meetings'
-import type { BookingLink, CalendarStatus, CalendarSyncStatus, Meeting, Opportunity, Prospect } from '../types'
+import type { BookingLink, CalendarStatus, CalendarSyncStatus, Meeting, Opportunity, Prospect, TasksStatus } from '../types'
 import { Banner, ErrorBanner, SelectField, Tabs, TextField, useLoad } from '../ui'
 
 type Tab = 'schedule' | 'booking' | 'sync'
@@ -35,6 +35,39 @@ function calendarUrl(f: { title: string; when: string; minutes: number; attendee
 const splitEmails = (s: string) => s.split(/[\s,;]+/).filter(Boolean)
 // §6.1 suggested title: “[Account] — [Action]” (Other uses its own words).
 const actionTitle = (code: string | null, other: string | null, label: string, otherCode: string) => (code === otherCode ? (other || 'Follow-up') : label || 'Meeting')
+
+// §6.3 one-way Google Tasks: each person opts in; the CRM stays the source of truth.
+function TasksBar() {
+  const status = useLoad(() => api<TasksStatus>('/tasks/status'), [])
+  const [error, setError] = useState<ApiError | null>(null)
+  const [busy, setBusy] = useState(false)
+  const s = status.data
+  if (!s || !s.configured) return null
+  const run = (path: string) => {
+    setBusy(true)
+    setError(null)
+    api<{ url?: string }>(path, { method: 'POST' })
+      .then((r) => { if (r.url) window.location.href = r.url; else void status.reload() })
+      .catch((e: ApiError) => setError(e)).finally(() => setBusy(false))
+  }
+  const n = s.counts
+  const attention = (n.failed || 0) + (n.not_connected || 0)
+  return (
+    <>
+      <ErrorBanner error={error || status.error} onClose={() => setError(null)} />
+      <div className={`banner banner-${s.enabled ? 'ok' : 'warn'}`} role="status">
+        <div>
+          {s.enabled
+            ? <>Google Tasks on: {n.synced || 0} next action{(n.synced || 0) === 1 ? '' : 's'} in your “LeadStrategus CRM” list{attention ? ` · ${attention} need a retry (on the record)` : ''}. One-way: ticking or editing a task in Google doesn’t change the CRM.</>
+            : <>Optional: mirror your open next actions into Google Tasks as personal to-dos. One-way, so the CRM stays the source of truth.</>}
+        </div>
+        {s.enabled
+          ? <button type="button" className="btn" disabled={busy} onClick={() => { if (window.confirm('Turn off Google Tasks? This removes the “LeadStrategus CRM” list from your Google Tasks.')) run('/tasks/disable') }}>Turn off</button>
+          : <button type="button" className="btn btn-dark" disabled={busy} onClick={() => run('/tasks/enable')}>Turn on Google Tasks</button>}
+      </div>
+    </>
+  )
+}
 
 function ConnectionBar({ status, onChange }: { status: CalendarStatus; onChange: () => void }) {
   const [error, setError] = useState<ApiError | null>(null)
@@ -298,7 +331,7 @@ function SyncTab() {
         <ErrorBanner error={error} />
         <div className="table-wrap">
           <table style={{ minWidth: 680 }}>
-            <thead><tr><th>User</th><th>Google Calendar</th><th>Last sync</th><th>Not yet in Calendar</th><th>Booking links</th></tr></thead>
+            <thead><tr><th>User</th><th>Google Calendar</th><th>Last sync</th><th>Not yet in Calendar</th><th>Google Tasks</th><th>Booking links</th></tr></thead>
             <tbody>
               {(data?.users || []).map((u) => {
                 const [label, pill] = CONN[u.status || ''] || ['Not connected', 'grey']
@@ -308,6 +341,7 @@ function SyncTab() {
                     <td><span className={`pill pill-${pill}`}>{label}</span>{u.last_error && <div className="sub" style={{ color: 'var(--red-ink)' }}>{u.last_error}</div>}</td>
                     <td className="muted">{u.last_sync_at ? fmtDateTime(u.last_sync_at) : '—'}</td>
                     <td>{u.unsynced ? <span className="pill pill-amber">{u.unsynced}</span> : '0'}</td>
+                    <td>{u.tasks_enabled ? <span className="pill pill-teal">On</span> : <span className="pill pill-grey">Off</span>}{u.tasks_unsynced ? <span className="pill pill-amber" style={{ marginLeft: 6 }}>{u.tasks_unsynced} to retry</span> : null}</td>
                     <td>{u.booking_links}</td>
                   </tr>
                 )
@@ -347,10 +381,11 @@ export default function Meetings() {
           <p>Meetings live in each person’s own Google Calendar with a Google Meet link. The CRM records them on the linked prospect or opportunity and shows every sync failure.</p>
         </div>
       </div>
-      {returned === 'connected' && <Banner onClose={() => setParams({})}>Google Calendar connected. Meetings waiting to sync have been sent.</Banner>}
+      {returned === 'connected' && <Banner onClose={() => setParams({})}>Google Calendar connected. Meetings waiting to sync have been sent.{message ? ` ${message}` : ''}</Banner>}
       {returned === 'error' && <Banner kind="err" onClose={() => setParams({})}>{message || 'Google Calendar wasn’t connected.'}</Banner>}
       <ErrorBanner error={status.error} />
       {status.data && <ConnectionBar status={status.data} onChange={() => void status.reload()} />}
+      {status.data && <TasksBar key={String(status.data.connected)} />}
       <Tabs<Tab> label="Meetings sections" value={tab} onChange={setTab}
         tabs={[{ value: 'schedule', label: 'Schedule a meeting' }, { value: 'booking', label: 'Booking links' }, { value: 'sync', label: 'Calendar sync status' }]} />
       {tab === 'schedule' && status.data && <ScheduleTab status={status.data} reloadStatus={() => void status.reload()} />}

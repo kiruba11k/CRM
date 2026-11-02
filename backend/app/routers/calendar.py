@@ -15,7 +15,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from .. import domain, google_calendar as gc
+from .. import domain, google_calendar as gc, tasksync
 from ..auth import User, current_user, get_con
 from ..config import Settings, get_settings
 from ..records import log_activity, raise_if_errors
@@ -186,7 +186,8 @@ async def oauth_callback(request: Request, state: str = "", code: str = "", erro
         return back("error", "Google Calendar wasn’t connected (access was declined).")
     try:
         google = _google(request, settings)
-        user_id = gc.read_state(settings.token_key, state)
+        state_data = gc.read_state_data(settings.token_key, state)
+        user_id = state_data["u"]
         user = await con.fetchrow("SELECT id, email, active FROM users WHERE id = $1", UUID(user_id))
         if user is None or not user["active"]:
             raise gc.CalendarError("Your CRM access isn’t active.")
@@ -209,16 +210,25 @@ async def oauth_callback(request: Request, state: str = "", code: str = "", erro
         "scopes = EXCLUDED.scopes, status = 'connected', connected_at = now(), last_error = NULL",
         user["id"], email, gc.encrypt(settings.token_key, tokens["refresh_token"]), tokens.get("scope", ""))
     await _log(con, None, user["id"], "connect", True, f"Connected Google Calendar for {email}.")
+    tasks_note = ""
+    if state_data.get("k"):
+        if gc.TASKS_SCOPE in tokens.get("scope", ""):
+            await con.execute("UPDATE calendar_connections SET tasks_enabled = true WHERE user_id = $1", user["id"])
+            tasksync.start_backfill(request, user["id"])
+        else:
+            tasks_note = "Google Tasks access wasn’t granted, so Tasks sync stays off."
     # Push anything that was waiting for this connection.
     waiting = await con.fetch(
         "SELECT id FROM meetings WHERE owner_id = $1 AND NOT cancelled AND sync_status IN ('not_connected', 'failed') AND ends_at > now()", user["id"])
     for w in waiting:
         await sync_meeting(con, google, settings, w["id"], "retry")
-    return back("connected")
+    return back("connected", tasks_note)
 
 
 @router.post("/calendar/disconnect")
 async def disconnect(request: Request, con: asyncpg.Connection = Depends(get_con), settings: Settings = Depends(get_settings), user: User = Depends(current_user)):
+    # Tasks rides on the same Google access: remove the CRM's list first.
+    await tasksync.disable(con, None if settings.calendar_missing else _google(request, settings), settings, UUID(user.id))
     row = await con.fetchrow("DELETE FROM calendar_connections WHERE user_id = $1 RETURNING refresh_token_encrypted", UUID(user.id))
     if row and not settings.calendar_missing:
         try:
@@ -234,14 +244,16 @@ async def sync_status(con: asyncpg.Connection = Depends(get_con), user: User = D
     """Managers and admins see everyone; salespeople see themselves."""
     only = None if user.can_edit_all else UUID(user.id)
     users = await con.fetch(
-        "SELECT u.id, u.name, u.email, c.status, c.google_email, c.last_sync_at, c.last_error, "
+        "SELECT u.id, u.name, u.email, c.status, c.google_email, c.last_sync_at, c.last_error, coalesce(c.tasks_enabled, false) AS tasks_enabled, "
+        "(SELECT count(*) FROM task_links t WHERE t.owner_id = u.id AND t.active AND t.sync_status IN ('failed', 'not_connected')) AS tasks_unsynced, "
         "(SELECT count(*) FROM meetings m WHERE m.owner_id = u.id AND m.sync_status IN ('failed', 'not_connected') AND NOT m.cancelled) AS unsynced, "
         "(SELECT count(*) FROM booking_links b WHERE b.owner_id = u.id AND b.active) AS booking_links "
         "FROM users u LEFT JOIN calendar_connections c ON c.user_id = u.id "
         "WHERE u.active AND ($1::uuid IS NULL OR u.id = $1) ORDER BY u.name", only)
     log = await con.fetch(
-        "SELECT l.at, l.action, l.ok, l.message, l.meeting_id, u.name AS user_name, m.title AS meeting_title "
+        "SELECT l.at, l.action, l.ok, l.message, l.meeting_id, u.name AS user_name, coalesce(m.title, t.title) AS meeting_title "
         "FROM calendar_sync_log l LEFT JOIN users u ON u.id = l.user_id LEFT JOIN meetings m ON m.id = l.meeting_id "
+        "LEFT JOIN task_links t ON t.id = l.task_link_id "
         "WHERE ($1::uuid IS NULL OR l.user_id = $1) ORDER BY l.at DESC, l.id DESC LIMIT 50", only)
     return {"users": [dict(r) for r in users], "log": [dict(r) for r in log]}
 

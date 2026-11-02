@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, api } from '../api'
 import { fmtDateTime } from '../format'
-import type { FollowUp, Meeting, SyncState } from '../types'
+import type { FollowUp, Meeting, SyncState, TaskLink, TaskSyncState } from '../types'
 import { ErrorBanner, useLoad } from '../ui'
 
 const SYNC: Record<SyncState, { label: string; pill: string }> = {
@@ -58,6 +58,37 @@ export function FollowUpStatus({ followUp, onChange }: { followUp: FollowUp | nu
         <button type="button" className="btn btn-outline" disabled={busy} onClick={retry}>Retry sync</button>
       )}
       {followUp.sync_error && <span className="small" style={{ color: 'var(--red-ink)', flexBasis: '100%' }}>{followUp.sync_error}</span>}
+      <ErrorBanner error={error} onClose={() => setError(null)} />
+    </div>
+  )
+}
+
+const TASK: Record<TaskSyncState, { label: string; pill: string }> = {
+  synced: { label: 'In Google Tasks', pill: 'teal' },
+  pending: { label: 'Syncing to Tasks…', pill: 'blue' },
+  failed: { label: 'Tasks sync failed', pill: 'red' },
+  not_connected: { label: 'Not in Google Tasks', pill: 'amber' },
+  completed: { label: 'Ticked off in Tasks', pill: 'grey' },
+  removed: { label: 'Removed from Tasks', pill: 'grey' },
+}
+
+// The Google Tasks to-do mirroring this record's next action (§6.3, one-way).
+export function TaskStatus({ task, onChange }: { task: TaskLink | null; onChange: () => void }) {
+  const [error, setError] = useState<ApiError | null>(null)
+  const [busy, setBusy] = useState(false)
+  if (!task) return null
+  const retry = () => {
+    setBusy(true)
+    api(`/tasks/links/${task.id}/retry`, { method: 'POST' }).then(onChange).catch((e: ApiError) => setError(e)).finally(() => setBusy(false))
+  }
+  return (
+    <div className="row" style={{ gap: 8 }} aria-label="Google Tasks">
+      <span className={`pill pill-${TASK[task.sync_status].pill}`}>{TASK[task.sync_status].label}</span>
+      <span className="small muted">{task.title}</span>
+      {['failed', 'not_connected', 'pending'].includes(task.sync_status) && (
+        <button type="button" className="btn btn-outline" disabled={busy} onClick={retry}>Retry sync</button>
+      )}
+      {task.sync_error && <span className="small" style={{ color: 'var(--red-ink)', flexBasis: '100%' }}>{task.sync_error}</span>}
       <ErrorBanner error={error} onClose={() => setError(null)} />
     </div>
   )

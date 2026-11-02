@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
-import { FollowUpStatus, MeetingsCard } from '../components/Meetings'
+import { FollowUpStatus, MeetingsCard, TaskStatus } from '../components/Meetings'
 import { GmailCard } from '../components/Gmail'
 import type { Account, FormValue, FormValues, Issue, Opportunity, ProspectDetail } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, changedFields, compact, useLoad, withCurrent } from '../ui'
@@ -118,6 +118,7 @@ export default function ProspectRecord() {
               <>
                 <div className="grid-fields"><NextActionFields value={form} onChange={setForm} errors={errors} withCalendar /></div>
                 <FollowUpStatus followUp={data.follow_up} onChange={() => void reload()} />
+                <TaskStatus task={data.task} onChange={() => void reload()} />
               </>
             )}
           </section>

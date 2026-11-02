@@ -7,7 +7,7 @@ import { ApiError, api } from '../api'
 import { money, probabilityOf, domainOf } from '../format'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
-import { FollowUpStatus, MeetingsCard } from '../components/Meetings'
+import { FollowUpStatus, MeetingsCard, TaskStatus } from '../components/Meetings'
 import { GmailCard } from '../components/Gmail'
 import type { Account, AccountDetail, FormValue, FormValues, Issue, OpportunityDetail, Prospect } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, TextField, WarningsBanner, changedFields, useLoad, withCurrent } from '../ui'
@@ -131,6 +131,7 @@ export default function OpportunityRecord() {
                   <div className="grid-fields"><NextActionFields value={form} onChange={setForm} errors={errors} withCalendar /></div>
                   <FollowUpStatus followUp={data.follow_up} onChange={() => void reload()} />
                 </>}
+            <TaskStatus task={data.task} onChange={() => void reload()} />
           </section>
 
           <section className="card" aria-label="Opportunity">

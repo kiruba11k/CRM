@@ -5,7 +5,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .. import domain, followups
+from .. import domain, followups, integrations, tasksync
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
 from ..records import activities, get_or_404, history, insert, log_activity, raise_if_errors, record_changes, update
 from ..schemas import CompleteActionIn, ConvertProspectIn, NoteIn, ProspectIn, ProspectPatch
@@ -59,7 +59,7 @@ async def create_prospect(body: ProspectIn, request: Request, con: asyncpg.Conne
     async with con.transaction():
         row = await _save_or_conflict(insert(con, "prospects", data))
         await record_changes(con, "prospect", row["id"], None, row, user.id)
-    await followups.reconcile(request, con, "prospect", row["id"])
+    await integrations.after_save(request, con, "prospect", row["id"])
     return {**row, "warnings": warnings}
 
 
@@ -73,6 +73,7 @@ async def get_prospect(prospect_id: UUID, con: asyncpg.Connection = Depends(get_
     return {
         **p,
         "follow_up": await followups.current(con, "prospect", prospect_id),
+        "task": await tasksync.current(con, "prospect", prospect_id),
         "opportunities": opps,
         "activities": await activities(con, [("prospect", prospect_id)]),
         "history": await history(con, "prospect", prospect_id),
@@ -101,7 +102,7 @@ async def update_prospect(
         await record_changes(con, "prospect", prospect_id, before, row, user.id)
         if before["status"] != row["status"]:
             await log_activity(con, "prospect", prospect_id, "status_change", f"Status: {before['status']} → {row['status']}", user.id)
-    await followups.reconcile(request, con, "prospect", prospect_id)
+    await integrations.after_save(request, con, "prospect", prospect_id)
     return {**row, "warnings": warnings}
 
 
@@ -124,7 +125,7 @@ async def complete_action(
         patch["last_activity_at"] = await con.fetchval("SELECT now()")
         row = await update(con, "prospects", prospect_id, patch)
         await record_changes(con, "prospect", prospect_id, before, row, user.id)
-    await followups.reconcile(request, con, "prospect", prospect_id)
+    await integrations.after_save(request, con, "prospect", prospect_id, completed=True)
     return row
 
 
@@ -161,5 +162,5 @@ async def convert_to_opportunity(
         row = await update(con, "prospects", prospect_id, p_patch)
         await record_changes(con, "prospect", prospect_id, p, row, user.id)
         await log_activity(con, "prospect", prospect_id, "converted", f"Opportunity created: {opp['name']}", user.id)
-    await followups.reconcile(request, con, "opportunity", opp["id"])
+    await integrations.after_save(request, con, "opportunity", opp["id"])
     return opp

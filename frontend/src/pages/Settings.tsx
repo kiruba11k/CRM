@@ -337,7 +337,7 @@ const INTEGRATIONS: [string, string, string, keyof typeof INTEG_STATE][] = [
   ['HubSpot import', 'Pilot', 'Read-only private-app token on the server (CRM_HUBSPOT_TOKEN). Re-runnable; never overwrites records edited in the CRM.', 'live'],
   ['Google Calendar + Meet', 'Priority 1', 'Create, update and cancel meetings in each person’s own calendar with a Meet link. Per-user sign-in, event ID stored to prevent duplicates, sync status and retry shown. Booking links use Google appointment schedules (free/busy).', 'calendar'],
   ['Gmail: thread association', 'Later, if useful', 'Link a specific thread to a record, storing only the thread ID and minimal metadata.', 'later'],
-  ['Google Tasks', 'Optional', 'Mirror next actions into Google Tasks. Deferred unless it proves worth the extra sign-in work.', 'later'],
+  ['Google Tasks', 'Optional', 'One-way: each person can mirror their open next actions into a “LeadStrategus CRM” list in Google Tasks. Changes in Google aren’t copied back; the CRM stays the source of truth.', 'calendar'],
 ]
 const INTEG_STATE = { live: ['Live', 'teal'], planned: ['Planned', 'amber'], later: ['Deferred', 'grey'], calendar: ['', ''] } as const
 

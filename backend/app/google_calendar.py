@@ -27,7 +27,13 @@ CALENDAR_API = "https://www.googleapis.com/calendar/v3/calendars"
 def events_url(calendar_id: str) -> str:
     """A user's primary calendar ID is their own email address."""
     return f"{CALENDAR_API}/{quote(calendar_id, safe='')}/events"
+
+
 SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.events"]
+# §6.3 Google Tasks: asked for only when a user turns Tasks on. Google has no
+# narrower scope that can write tasks.
+TASKS_SCOPE = "https://www.googleapis.com/auth/tasks"
+TASKS_API = "https://tasks.googleapis.com/tasks/v1"
 STATE_TTL = 600
 
 
@@ -60,14 +66,20 @@ def decrypt(secret: str, value: str) -> str:
         raise CalendarError("Stored Google credentials can’t be read (CRM_TOKEN_KEY changed?). Reconnect Google Calendar.", reconnect=True) from e
 
 
-def make_state(secret: str, user_id: str, now: Optional[float] = None) -> str:
-    payload = base64.urlsafe_b64encode(json.dumps({"u": user_id, "t": int(now or time.time())}).encode()).decode().rstrip("=")
+def make_state(secret: str, user_id: str, now: Optional[float] = None, tasks: bool = False) -> str:
+    data = {"u": user_id, "t": int(now or time.time()), **({"k": 1} if tasks else {})}
+    payload = base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip("=")
     sig = hmac.new(_key(secret, b"oauth-state"), payload.encode(), hashlib.sha256).hexdigest()[:32]
     return f"{payload}.{sig}"
 
 
 def read_state(secret: str, state: str, now: Optional[float] = None) -> str:
     """Return the user ID in a valid, unexpired state, else raise."""
+    return read_state_data(secret, state, now)["u"]
+
+
+def read_state_data(secret: str, state: str, now: Optional[float] = None) -> dict:
+    """The whole signed state: user ID (u), time (t), Tasks requested (k)."""
     try:
         payload, sig = state.split(".", 1)
     except ValueError as e:
@@ -78,12 +90,13 @@ def read_state(secret: str, state: str, now: Optional[float] = None) -> str:
     data = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
     if (now or time.time()) - data["t"] > STATE_TTL:
         raise CalendarError("The Google sign-in took too long. Try connecting again.")
-    return data["u"]
+    return data
 
 
-def auth_url(client_id: str, redirect_uri: str, state: str, login_hint: str, domain: str) -> str:
+def auth_url(client_id: str, redirect_uri: str, state: str, login_hint: str, domain: str, tasks: bool = False) -> str:
     return AUTH_URL + "?" + urlencode({
-        "client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code", "scope": " ".join(SCOPES),
+        "client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code",
+        "scope": " ".join(SCOPES + ([TASKS_SCOPE] if tasks else [])),
         "access_type": "offline", "prompt": "consent", "include_granted_scopes": "true",
         "state": state, "login_hint": login_hint, "hd": domain,
     })
@@ -180,6 +193,47 @@ class Google:
         except CalendarError as e:
             if e.status not in (404, 410):  # already gone counts as cancelled
                 raise
+
+
+    # ── Google Tasks (§6.3) ───────────────────────────────────────────
+    async def create_tasklist(self, refresh_token: str, title: str) -> str:
+        return (await self._call(refresh_token, "POST", f"{TASKS_API}/users/@me/lists", json={"title": title}))["id"]
+
+    async def delete_tasklist(self, refresh_token: str, tasklist_id: str) -> None:
+        try:
+            await self._call(refresh_token, "DELETE", f"{TASKS_API}/users/@me/lists/{quote(tasklist_id, safe='')}")
+        except CalendarError as e:
+            if e.status not in (404, 410):
+                raise
+
+    def _tasks(self, tasklist_id: str) -> str:
+        return f"{TASKS_API}/lists/{quote(tasklist_id, safe='')}/tasks"
+
+    async def insert_task(self, refresh_token: str, tasklist_id: str, body: dict) -> dict:
+        return await self._call(refresh_token, "POST", self._tasks(tasklist_id), json=body)
+
+    async def patch_task(self, refresh_token: str, tasklist_id: str, task_id: str, body: dict) -> dict:
+        return await self._call(refresh_token, "PATCH", f"{self._tasks(tasklist_id)}/{quote(task_id, safe='')}", json=body)
+
+    async def delete_task(self, refresh_token: str, tasklist_id: str, task_id: str) -> None:
+        try:
+            await self._call(refresh_token, "DELETE", f"{self._tasks(tasklist_id)}/{quote(task_id, safe='')}")
+        except CalendarError as e:
+            if e.status not in (404, 410):
+                raise
+
+    async def find_task(self, refresh_token: str, tasklist_id: str, marker: str) -> Optional[dict]:
+        """A task in the CRM's list whose notes carry `marker`: lets a retried
+        create adopt the task an earlier, unanswered attempt made."""
+        params: dict = {"showCompleted": "true", "showHidden": "true", "maxResults": 100}
+        while True:
+            data = await self._call(refresh_token, "GET", self._tasks(tasklist_id), params=params) or {}
+            for t in data.get("items", []):
+                if marker in (t.get("notes") or ""):
+                    return t
+            if not data.get("nextPageToken"):
+                return None
+            params["pageToken"] = data["nextPageToken"]
 
 
 def event_id_for(meeting_id: str) -> str:

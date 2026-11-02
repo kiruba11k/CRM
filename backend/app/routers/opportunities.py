@@ -6,7 +6,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .. import domain, followups
+from .. import domain, followups, integrations, tasksync
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
 from ..records import activities, get_or_404, history, insert, log_activity, raise_if_errors, record_changes, update
 from ..schemas import CompleteActionIn, NoteIn, OpportunityIn, OpportunityPatch, RevisitIn
@@ -102,7 +102,7 @@ async def list_opportunities(
 async def create_opportunity(body: OpportunityIn, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
     async with con.transaction():
         result = await create_opportunity_record(con, body.model_dump(), user)
-    await followups.reconcile(request, con, "opportunity", result["id"])
+    await integrations.after_save(request, con, "opportunity", result["id"])
     return result
 
 
@@ -114,6 +114,7 @@ async def get_opportunity(opp_id: UUID, con: asyncpg.Connection = Depends(get_co
         **_with_derived(row),
         **(await _teams(con, opp_id)),
         "follow_up": await followups.current(con, "opportunity", opp_id),
+        "task": await tasksync.current(con, "opportunity", opp_id),
         "warnings": warnings,
         "activities": await activities(con, [("opportunity", opp_id)]),
         "history": await history(con, "opportunity", opp_id),
@@ -156,7 +157,7 @@ async def update_opportunity(
             raise HTTPException(422, {"message": "Fix the highlighted fields before saving.", "errors": [{"field": "account_id", "message": "Account not found."}]})
     async with con.transaction():
         result = await _apply_update(con, opp_id, before, patch, user)
-    await followups.reconcile(request, con, "opportunity", opp_id)
+    await integrations.after_save(request, con, "opportunity", opp_id)
     return result
 
 
@@ -174,7 +175,7 @@ async def complete_action(
     async with con.transaction():
         await log_activity(con, "opportunity", opp_id, "action_completed", f"Completed: {done}" + (f". {body.note}" if body.note else ""), user.id)
         result = await _apply_update(con, opp_id, before, body.model_dump(exclude={"note"}), user)
-    await followups.reconcile(request, con, "opportunity", opp_id)
+    await integrations.after_save(request, con, "opportunity", opp_id, completed=True)
     return result
 
 
@@ -197,7 +198,7 @@ async def revisit_nurture(
         patch = {"on_nurture": False, "stage": domain.LOST, "lost_reason": body.lost_reason, "lost_notes": body.lost_notes, "lost_date": body.lost_date or date.today()}
     async with con.transaction():
         result = await _apply_update(con, opp_id, before, patch, user)
-    await followups.reconcile(request, con, "opportunity", opp_id)
+    await integrations.after_save(request, con, "opportunity", opp_id, completed=True)
     return result
 
 

@@ -20,7 +20,7 @@ integration. Staff only (Google Workspace sign-in).
 | 2 | Frontend: My Actions, Prospects, Pipeline, Opportunity/Prospect/Account records, quick create, saved views | **Done** (`frontend/`) |
 | 2b | Frontend: Reports & metrics, Settings (lists, reminders, users & roles, integrations, export & backup, launch checklist), Meetings & booking links, Import from HubSpot | **Done**: Reports, users & roles, CSV export live; Meetings opens a pre-filled Google Calendar event and logs it |
 | 3 | HubSpot import: owners, companies, contacts, deals, associations, notes/calls/meetings/tasks, logged emails; re-runnable; Needs cleanup queue | **Done** (`backend/app/importer.py`) |
-| 4 | Google Calendar + Meet sync per user (create, update, cancel, retry, sync log), follow-up events, shared booking links; Gmail search/compose in context + explicit thread links | **Done** (`backend/app/google_calendar.py`, `routers/calendar.py`) |
+| 4 | Google Calendar + Meet sync per user (create, update, cancel, retry, sync log), follow-up events, shared booking links; Gmail search/compose in context + explicit thread links; one-way Google Tasks | **Done** (`backend/app/google_calendar.py`, `routers/calendar.py`) |
 | 5 | Settings: editable controlled lists (add, rename, reorder, retire), stage probabilities, reminder switches + escalation threshold, shared launch checklist, settings change log | **Done** (`backend/app/routers/settings.py`, `app/listconfig.py`) |
 
 ## Layout
@@ -149,6 +149,31 @@ state with a retry.
 Booking links are Google Calendar **appointment schedules** (Google runs
 the booking page, free/busy check and invites); the CRM keeps a shared,
 team-wide list of them.
+
+## Google Tasks (§6.3, one-way)
+
+Each person can switch on **Google Tasks** on the Meetings page. The first
+time, Google asks for Tasks access on top of Calendar. Their open next
+actions, and the revisit date of each nurtured deal they own, are then
+mirrored into a **LeadStrategus CRM** list in Google Tasks. Each task is
+titled "[Account] — [Action]", is due on the action's date, and carries the
+record's context and link.
+
+- Rescheduling or rewording the action updates the same task.
+- Completing it in the CRM ticks the task off.
+- Closing the record removes the task. Changing the owner moves the task to
+  the new owner's list, if that person has Tasks on.
+- Sync is one-way: ticking or editing a task in Google never changes the
+  CRM, which stays the source of truth.
+- A task counts as synced only after Google confirms it. Failures show on
+  the record with **Retry sync**.
+- A retry first looks for the task an unanswered attempt made, so it never
+  duplicates one.
+- Turning Tasks off (or disconnecting Google) deletes the CRM's list.
+
+Setup: in the same Google Cloud project, enable the **Google Tasks API**
+and add the scope `.../auth/tasks` to the consent screen. Nothing else
+changes on Render.
 
 ## Gmail (§6.2)
 

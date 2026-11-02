@@ -71,7 +71,7 @@ export interface Opportunity {
 export interface OpportunityDetail extends Opportunity {
   database_build_team: { id: string; name: string }[]
   proposal_team: { id: string; name: string }[]
-  warnings: Issue[]; activities: Activity[]; history: HistoryEntry[]; follow_up: FollowUp | null
+  warnings: Issue[]; activities: Activity[]; history: HistoryEntry[]; follow_up: FollowUp | null; task: TaskLink | null
 }
 
 // The calendar event kept for a next action with a time (§6.1).
@@ -82,7 +82,7 @@ export interface FollowUp {
 
 export interface ProspectDetail extends Prospect {
   opportunities: Pick<Opportunity, 'id' | 'name' | 'stage' | 'estimated_value' | 'currency' | 'on_nurture'>[]
-  activities: Activity[]; history: HistoryEntry[]; follow_up: FollowUp | null
+  activities: Activity[]; history: HistoryEntry[]; follow_up: FollowUp | null; task: TaskLink | null
 }
 
 export interface AccountDetail extends Account {
@@ -157,7 +157,7 @@ export interface CalendarStatus {
 }
 export interface CalendarSyncStatus {
   users: { id: string; name: string; email: string; status: 'connected' | 'needs_reconnect' | null; google_email: string | null
-    last_sync_at: string | null; last_error: string | null; unsynced: number; booking_links: number }[]
+    last_sync_at: string | null; last_error: string | null; unsynced: number; booking_links: number; tasks_enabled: boolean; tasks_unsynced: number }[]
   log: { at: string; action: string; ok: boolean; message: string; meeting_id: string | null; user_name: string | null; meeting_title: string | null }[]
 }
 export interface BookingLink { id: string; owner_id: string; owner_name: string; name: string; url: string; active: boolean; created_at: string }
@@ -167,3 +167,8 @@ export interface EmailThread {
   id: string; entity_type: 'account' | 'prospect' | 'opportunity'; entity_id: string; thread_ref: string
   url: string; label: string; linked_at: string; linked_by: string | null; linked_by_name: string | null
 }
+
+// §6.3 one-way Google Tasks mirror of a record's next action.
+export type TaskSyncState = 'pending' | 'synced' | 'failed' | 'not_connected' | 'completed' | 'removed'
+export interface TaskLink { id: string; title: string; due: string; sync_status: TaskSyncState; sync_error: string | null; synced_at: string | null; owner_id: string }
+export interface TasksStatus { configured: boolean; connected: boolean; enabled: boolean; granted: boolean; counts: Partial<Record<TaskSyncState, number>> }
