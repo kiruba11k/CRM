@@ -1,11 +1,16 @@
 // §7 Pipeline Kanban: opportunities by stage with account, value, owner,
 // close date, risk and next action. Nurtured ones are hidden by default.
-import { useMemo, useState } from 'react'
+// Drag a card to another column to change its stage: it moves at once,
+// asks for any details the new stage requires, and slides back if the
+// save fails. Each move can be undone from the toast.
+import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api'
+import { ApiError, api } from '../api'
+import StageMoveDialog from '../components/StageMove'
+import { useToast } from '../components/Toast'
 import { fmtDate, money, moneyByCurrency, todayIso, totalsByCurrency } from '../format'
 import { useSession } from '../session'
-import type { Opportunity, PipelineReport } from '../types'
+import type { FieldErrors, Opportunity, PipelineReport } from '../types'
 import { ErrorBanner, RiskPill, SelectField, useLoad } from '../ui'
 
 const STAGE_COLOR: Record<string, string> = {
@@ -28,17 +33,58 @@ export default function Pipeline() {
   const { data, error, loading } = useLoad(() => api<Opportunity[]>('/opportunities', { params: { include_nurtured: true } }), [])
   const report = useLoad(() => api<PipelineReport>('/reports/pipeline'), [])
   const today = todayIso()
+  const toast = useToast()
+  const [rows, setRows] = useState<Opportunity[] | null>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [over, setOver] = useState<string | null>(null)
+  const [landed, setLanded] = useState<string | null>(null)
+  const [pending, setPending] = useState<{ opp: Opportunity; stage: string; errors: FieldErrors } | null>(null)
+  useEffect(() => { if (data) setRows(data) }, [data])
 
-  const visible = useMemo(() => (data || []).filter((o) =>
-    (showNurture || !o.on_nurture) && (!f.owner || o.owner_id === f.owner) && (!f.risk || o.risk_rating === f.risk) && (!f.service || o.service_line === f.service)), [data, f, showNurture])
-  const nurtureCount = (data || []).filter((o) => o.on_nurture).length
+  const replace = (o: Opportunity, patch: Partial<Opportunity>) => setRows((rs) => (rs || []).map((r) => (r.id === o.id ? { ...r, ...patch } : r)))
+  function settled(before: Opportunity, saved: Opportunity, undoable: boolean) {
+    replace(before, { ...saved, account_name: before.account_name, owner_name: before.owner_name })
+    setLanded(saved.id)
+    window.setTimeout(() => setLanded((l) => (l === saved.id ? null : l)), 700)
+    void report.reload()
+    toast(`Moved “${before.name}” to ${saved.stage}.`, undoable ? { action: { label: 'Undo', run: () => void move({ ...before, stage: saved.stage }, before.stage, false) } } : undefined)
+  }
+  async function move(o: Opportunity, stage: string, undoable = true) {
+    if (o.stage === stage) return
+    replace(o, { stage })
+    try {
+      settled(o, await api<Opportunity>(`/opportunities/${o.id}`, { method: 'PATCH', body: { stage } }), undoable)
+    } catch (e) {
+      const err = e as ApiError
+      replace(o, { stage: o.stage })
+      if (err.status === 422 && Object.keys(err.fieldErrors).length) setPending({ opp: o, stage, errors: err.fieldErrors })
+      else toast(err.message || 'Couldn’t move the deal.', { kind: 'err' })
+    }
+  }
+  const dragged = (rows || []).find((o) => o.id === dragId)
+  const onDragOver = (e: DragEvent, stage: string) => {
+    if (!dragged || dragged.stage === stage) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (over !== stage) setOver(stage)
+  }
+  const onDrop = (e: DragEvent, stage: string) => {
+    e.preventDefault()
+    setOver(null)
+    if (dragged) void move(dragged, stage)
+    setDragId(null)
+  }
+
+  const visible = useMemo(() => (rows || []).filter((o) =>
+    (showNurture || !o.on_nurture) && (!f.owner || o.owner_id === f.owner) && (!f.risk || o.risk_rating === f.risk) && (!f.service || o.service_line === f.service)), [rows, f, showNurture])
+  const nurtureCount = (rows || []).filter((o) => o.on_nurture).length
 
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Pipeline</h1>
-          <p>Open opportunities by sales stage. Open a card to change its stage. Nurtured opportunities keep their stage but are left out of the active board and forecast.</p>
+          <p>Open opportunities by sales stage. Drag a card to another stage to move it, or open it to edit. Nurtured opportunities keep their stage but are left out of the active board and forecast.</p>
         </div>
       </div>
       {report.data && (
@@ -55,7 +101,9 @@ export default function Pipeline() {
         <label className="check"><input type="checkbox" checked={showNurture} onChange={() => setShowNurture(!showNurture)} />Show nurtured ({nurtureCount})</label>
       </div>
       <ErrorBanner error={error} />
-      {loading && !data ? <div className="loading">Loading pipeline…</div> : (
+      {pending && <StageMoveDialog opp={pending.opp} stage={pending.stage} errors={pending.errors} onCancel={() => setPending(null)}
+        onDone={(saved) => { const p = pending; setPending(null); settled(p.opp, saved, true) }} />}
+      {loading && !data ? <div className="loading" data-label="Loading pipeline…">Loading pipeline…</div> : (
         <div className="board-scroll">
           <div className="board">
             {lists.stages.map(({ name, probability }) => {
@@ -65,14 +113,19 @@ export default function Pipeline() {
               const unweighted = totalsByCurrency(counted, (o) => o.estimated_value)
               const weighted = totalsByCurrency(counted, (o) => Number(o.estimated_value || 0) * probability / 100)
               return (
-                <section key={name} className={`column${closed ? ' closed' : ''}`} aria-label={name}>
+                <section key={name} className={`column${closed ? ' closed' : ''}${over === name ? ' drop-ok' : ''}`} aria-label={name}
+                  onDragOver={(e) => onDragOver(e, name)} onDrop={(e) => onDrop(e, name)}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver((s) => (s === name ? null : s)) }}>
                   <div className="column-bar" style={{ background: STAGE_COLOR[name] }} />
                   <div className="column-head"><span>{name} <span className="muted">{cards.length}</span></span><span className="mono muted">{probability}%</span></div>
                   <div className="column-cards">
                     {cards.map((o) => {
                       const overdue = !closed && !o.on_nurture && !!o.next_action_due && o.next_action_due < today
                       return (
-                        <Link key={o.id} to={`/opportunities/${o.id}`} className={`deal-card${o.on_nurture ? ' nurture' : o.risk_rating === 'High' ? ' risk-high' : ''}`}>
+                        <Link key={o.id} to={`/opportunities/${o.id}`} draggable aria-roledescription="draggable deal"
+                          onDragStart={(e) => { e.dataTransfer.setData('text/plain', o.id); e.dataTransfer.effectAllowed = 'move'; setDragId(o.id) }}
+                          onDragEnd={() => { setDragId(null); setOver(null) }}
+                          className={`deal-card${o.on_nurture ? ' nurture' : o.risk_rating === 'High' ? ' risk-high' : ''}${dragId === o.id ? ' dragging' : ''}${landed === o.id ? ' landed' : ''}`}>
                           <span className="small muted" style={{ fontWeight: 600 }}>{o.account_name}</span>
                           <span className="title">{o.name}</span>
                           <span className="mono" style={{ fontWeight: 600 }}>{money(o.estimated_value, o.currency)}</span>
@@ -84,7 +137,7 @@ export default function Pipeline() {
                         </Link>
                       )
                     })}
-                    {cards.length === 0 && <div className="empty small" style={{ border: '1px dashed var(--line-input)', borderRadius: 10, padding: 12 }}>None</div>}
+                    {cards.length === 0 && over !== name && <div className="empty small" style={{ border: '1px dashed var(--line-input)', borderRadius: 10, padding: 12 }}>None</div>}
                   </div>
                   <div className="column-foot">{moneyByCurrency(unweighted)}<br />weighted {moneyByCurrency(weighted)}</div>
                 </section>

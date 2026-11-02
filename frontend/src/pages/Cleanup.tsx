@@ -30,7 +30,7 @@ export default function Cleanup() {
       <Tabs<Scope> label="Whose records" value={scope} onChange={setScope}
         tabs={[{ value: 'mine', label: 'Mine' }, { value: 'all', label: 'Everyone’s' }]} />
       <ErrorBanner error={error} />
-      {loading && !data ? <div className="loading">Loading…</div> : (
+      {loading && !data ? <div className="loading" data-label="Loading…">Loading…</div> : (
         <div className="table-wrap">
           <table style={{ minWidth: 860 }}>
             <thead><tr><th>Record</th><th>Account</th><th>Owner</th><th>What to fix</th></tr></thead>

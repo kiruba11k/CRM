@@ -66,7 +66,7 @@ export default function OpportunityRecord() {
   }, [accountId])
 
   if (loadError) return <ErrorBanner error={loadError} />
-  if (!data || !form) return <div className="loading">Loading…</div>
+  if (!data || !form) return <div className="loading" data-label="Loading…">Loading…</div>
 
   const set = (k: string, v: FormValue) => setForm((f) => ({ ...(f as FormValues), [k]: v }))
   const errors = error?.fieldErrors || {}

@@ -172,3 +172,82 @@ td .sub { font-size: 12px; color: var(--ink-soft); }
 .side-list button { text-align: left; min-height: 40px; padding: 0 12px; border-radius: 8px; border: 0; background: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .side-list button[aria-pressed="true"] { background: var(--paper-deep); font-weight: 700; }
 .label-like { font-weight: 600; font-size: 13px; }
+
+/* ── Motion & interaction ────────────────────────────────────────────
+   Short, purposeful transitions: things that appear ease in, things you
+   can grab respond, things that leave slide out. All of it switches off
+   for people who ask their system for reduced motion. */
+:root {
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --t-fast: 140ms;
+  --t-med: 240ms;
+}
+@keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes slide-down { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes slide-out { to { opacity: 0; transform: translateX(24px); height: 0; padding-top: 0; padding-bottom: 0; } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes land { 0% { transform: scale(.96); box-shadow: 0 0 0 0 rgba(14, 124, 107, .5); } 60% { transform: scale(1.02); } 100% { transform: none; box-shadow: 0 0 0 8px rgba(14, 124, 107, 0); } }
+
+.page-enter { display: flex; flex-direction: column; gap: 16px; animation: fade-up var(--t-med) var(--ease-out); }
+.tiles > *, .cols > *, .section, .table-wrap, .board-scroll { animation: fade-up 320ms var(--ease-out) both; }
+.tiles > *:nth-child(2) { animation-delay: 40ms; } .tiles > *:nth-child(3) { animation-delay: 80ms; }
+.tiles > *:nth-child(4) { animation-delay: 120ms; } .tiles > *:nth-child(n+5) { animation-delay: 160ms; }
+
+.btn, .seg button, .tabs button, .steps button, .side-list button, .nav-links a, .check input {
+  transition: background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast), transform var(--t-fast) var(--ease-out);
+}
+.btn:not(:disabled):hover { transform: translateY(-1px); }
+.btn:not(:disabled):active, .seg button:active, .steps button:active { transform: translateY(0) scale(.97); }
+.btn-primary:not(:disabled):hover { box-shadow: 4px 4px 0 0 var(--ink); }
+.btn-primary:not(:disabled):active { box-shadow: 1px 1px 0 0 var(--ink); transform: translate(2px, 2px); }
+.nav-links a:not(.active):hover { background: rgba(251, 247, 240, .1); }
+.tabs button:not([aria-selected="true"]):hover { border-bottom-color: var(--line-input); }
+
+.tile, .deal-card, .card:not(.strong), .side-list button { transition: transform var(--t-med) var(--ease-out), box-shadow var(--t-med), border-color var(--t-fast); }
+.tile:hover, a.deal-card:hover, button.tile:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(30, 43, 51, .08); }
+.field input, .field select, .field textarea, .input { transition: border-color var(--t-fast), box-shadow var(--t-fast); }
+.field input:focus, .field select:focus, .field textarea:focus, .input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(14, 124, 107, .15); outline: none; }
+tbody tr { transition: background-color var(--t-fast); }
+tbody tr:hover { background: var(--paper-row); }
+.pill { transition: background-color var(--t-med), color var(--t-med); }
+
+.banner { animation: slide-down var(--t-med) var(--ease-out); }
+.modal-backdrop { animation: fade-in var(--t-med) ease; }
+.modal { animation: pop-in 280ms var(--ease-out); }
+.bar-fill { transform-origin: left center; animation: grow-x 700ms var(--ease-out) both; }
+.action-row { animation: fade-up 260ms var(--ease-out) both; }
+.action-row.leaving { animation: slide-out 280ms var(--ease-out) forwards; overflow: hidden; }
+
+/* Loading placeholders instead of bare "Loading…" text. */
+.loading { color: transparent; position: relative; min-height: 120px; border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--paper-row) 0, var(--paper-deep) 40%, var(--paper-row) 80%) 0 0 / 800px 100%;
+  animation: shimmer 1.2s linear infinite; }
+.loading::after { content: attr(data-label); position: absolute; left: 16px; top: 14px; color: var(--ink-soft); font-size: 13px; }
+
+/* Drag and drop */
+[draggable="true"] { cursor: grab; }
+[draggable="true"]:active { cursor: grabbing; }
+.deal-card.dragging { opacity: .45; transform: rotate(2deg) scale(.98); }
+.deal-card.landed { animation: land 600ms var(--ease-out); }
+.column { transition: background-color var(--t-fast), box-shadow var(--t-fast), transform var(--t-med) var(--ease-out); }
+.column.drop-ok { background: var(--teal-soft); box-shadow: inset 0 0 0 2px var(--teal); transform: translateY(-2px); }
+.column.drop-ok .column-cards::after { content: "Drop to move here"; display: block; border: 2px dashed var(--teal); border-radius: 10px; padding: 14px; text-align: center; font-size: 12px; font-weight: 700; color: var(--teal-ink); animation: fade-in var(--t-fast); }
+.drag-handle { cursor: grab; color: var(--ink-soft); padding: 0 6px; user-select: none; font-size: 16px; }
+.list-row.drag-over { box-shadow: inset 0 3px 0 0 var(--teal); }
+.list-row.dragging { opacity: .4; }
+
+/* Toasts */
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: flex; flex-direction: column; gap: 8px; width: min(380px, calc(100vw - 32px)); }
+.toast { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; padding: 12px 14px; border-radius: 12px; background: var(--ink); color: var(--paper); box-shadow: 0 10px 30px rgba(30, 43, 51, .25); animation: toast-in 300ms var(--ease-spring); font-weight: 600; font-size: 14px; }
+.toast.err { background: var(--red-ink); }
+.toast button { background: none; border: 0; color: inherit; cursor: pointer; font-weight: 700; }
+.toast .undo { text-decoration: underline; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

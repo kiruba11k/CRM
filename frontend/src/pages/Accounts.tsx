@@ -36,7 +36,7 @@ export default function Accounts() {
         <div style={{ width: 200 }}><SelectField label="Geography" value={country} onChange={setCountry} options={countries} placeholder="All countries" /></div>
       </div>
       <ErrorBanner error={error} />
-      {loading && !data ? <div className="loading">Loading accounts…</div> : (
+      {loading && !data ? <div className="loading" data-label="Loading accounts…">Loading accounts…</div> : (
         <div className="table-wrap">
           <table style={{ minWidth: 860 }}>
             <thead><tr><th>Account</th><th>Status</th><th>Geography</th><th>Owner</th><th className="num">Prospects</th><th className="num">Open opportunities</th><th className="num">Won</th></tr></thead>

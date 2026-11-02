@@ -109,7 +109,7 @@ export default function Reports() {
           options={[{ value: '90', label: 'Last 90 days' }, { value: 'quarter', label: 'This quarter' }, { value: 'ytd', label: 'Year to date' }]} />
       </div>
       <ErrorBanner error={data.error} />
-      {data.loading && !data.data ? <div className="loading">Loading reports…</div> : <>
+      {data.loading && !data.data ? <div className="loading" data-label="Loading reports…">Loading reports…</div> : <>
         <p className="muted small" style={{ margin: 0 }}>Window: {fmtDate(start)} – {fmtDate(today)}. Conversion and win rates use records created or closed in this window; forecast, overdue and nurture figures are as of today.</p>
         <section className="tiles" aria-label="Key metrics">
           {metrics.map((m) => (

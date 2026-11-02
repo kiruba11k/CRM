@@ -1,5 +1,5 @@
 // Small shared building blocks: form fields, banners, tabs, data loading.
-import { useCallback, useEffect, useId, useState, type DependencyList, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type DependencyList, type ReactNode } from 'react'
 import { ApiError } from './api'
 import { useSession } from './session'
 import type { FieldErrors, FormValue, FormValues, Issue } from './types'
@@ -207,4 +207,25 @@ export function changedFields<R extends object>(form: FormValues, record: R, key
     if (str(now ?? null) !== str((was as FormValue) ?? null)) out[k] = now ?? null
   }
   return out
+}
+
+// A number that counts up to its value when it first appears or changes.
+export function CountUp({ value, duration = 600 }: { value: number; duration?: number }) {
+  const [shown, setShown] = useState(value)
+  const from = useRef(0)
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setShown(value); return }
+    const start = performance.now()
+    const a = from.current
+    let raf = 0
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / duration)
+      setShown(Math.round(a + (value - a) * (1 - Math.pow(1 - p, 3))))
+      if (p < 1) raf = requestAnimationFrame(tick)
+      else from.current = value
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value, duration])
+  return <>{shown}</>
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { DEV_USER } from './api'
 import { useSessionState } from './session'
 import { Banner } from './ui'
@@ -64,6 +64,7 @@ export default function App() {
   const session = useSessionState()
   const [quick, setQuick] = useState<QuickType | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const location = useLocation()
 
   if (session.status === 'loading') return <div className="loading">Loading the CRM… (the server may take up to a minute to wake up)</div>
   if (session.status !== 'ready' || !session.user) return <Login />
@@ -95,6 +96,7 @@ export default function App() {
             ))}
           </div>
         </div>
+        <div className="page-enter" key={location.pathname}>
         <Routes key={refreshKey}>
           <Route path="/" element={<MyActions />} />
           <Route path="/prospects" element={<Prospects />} />
@@ -111,6 +113,7 @@ export default function App() {
           <Route path="/cleanup" element={<Cleanup />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </div>
       </main>
       {quick && <QuickCreate type={quick} onClose={() => setQuick(null)} onCreated={() => setRefreshKey((k) => k + 1)} />}
     </div>

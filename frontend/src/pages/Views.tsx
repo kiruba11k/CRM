@@ -87,7 +87,7 @@ export default function Views() {
       </div>
       <Tabs<View> label="Saved views" value={view} onChange={setView} tabs={(Object.keys(VIEWS) as View[]).map((value) => ({ value, label: VIEWS[value].label, count: lists[value].length }))} />
       <ErrorBanner error={all.error || forecast.error} />
-      {all.loading && !all.data ? <div className="loading">Loading…</div> : body}
+      {all.loading && !all.data ? <div className="loading" data-label="Loading…">Loading…</div> : body}
     </>
   )
 }

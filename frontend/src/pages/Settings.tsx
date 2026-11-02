@@ -104,8 +104,17 @@ function EditableListPanel({ listKey, view, onView, admin }: { listKey: Editable
   const list = view.lists[listKey]
   const [adding, setAdding] = useState('')
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null)
+  const [drag, setDrag] = useState<{ from: number; over: number | null } | null>(null)
   const act = useSettingsAction(onView)
   const values = list.options.map((o) => o.value)
+  const dropAt = (to: number) => {
+    if (!drag || drag.from === to) { setDrag(null); return }
+    const next = [...values]
+    const [item] = next.splice(drag.from, 1)
+    next.splice(to, 0, item)
+    setDrag(null)
+    void act.run(`/settings/lists/${listKey}/order`, 'PUT', { values: next })
+  }
   const move = (i: number, d: number) => {
     const next = [...values]
     ;[next[i], next[i + d]] = [next[i + d], next[i]]
@@ -118,7 +127,13 @@ function EditableListPanel({ listKey, view, onView, admin }: { listKey: Editable
       <ErrorBanner error={act.error} onClose={() => act.setError(null)} />
       <div>
         {list.options.map((o, i) => (
-          <div className="list-row" key={o.value} style={{ opacity: o.active ? 1 : 0.65 }}>
+          <div key={o.value} style={{ opacity: o.active ? 1 : 0.65 }}
+            className={`list-row${drag?.from === i ? ' dragging' : ''}${drag && drag.over === i && drag.from !== i ? ' drag-over' : ''}`}
+            draggable={admin && !renaming && !act.busy}
+            onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', o.value); setDrag({ from: i, over: null }) }}
+            onDragOver={(e) => { if (drag) { e.preventDefault(); if (drag.over !== i) setDrag({ ...drag, over: i }) } }}
+            onDrop={(e) => { e.preventDefault(); dropAt(i) }}
+            onDragEnd={() => setDrag(null)}>
             {renaming?.from === o.value ? (
               <span className="row" style={{ flex: '1 1 260px' }}>
                 <input className="input" aria-label={`New name for ${o.value}`} value={renaming.to} onChange={(e) => setRenaming({ ...renaming, to: e.target.value })} />
@@ -128,7 +143,7 @@ function EditableListPanel({ listKey, view, onView, admin }: { listKey: Editable
               </span>
             ) : (
               <span style={{ flex: '1 1 260px' }}>
-                <span className="mono muted">{String(i + 1).padStart(2, '0')}</span>&nbsp;&nbsp;{o.value}
+                {admin && <span className="drag-handle" aria-hidden="true" title="Drag to reorder">⠿</span>}<span className="mono muted">{String(i + 1).padStart(2, '0')}</span>&nbsp;&nbsp;{o.value}
                 <span className="muted small"> · {o.in_use} record{o.in_use === 1 ? '' : 's'}</span>
                 {!o.active && <span className="pill pill-grey" style={{ marginLeft: 8 }}>Retired</span>}
                 {o.protected && <span className="pill pill-paper" style={{ marginLeft: 8 }}>Used by the CRM</span>}
@@ -153,7 +168,7 @@ function EditableListPanel({ listKey, view, onView, admin }: { listKey: Editable
             <button type="button" className="btn btn-dark" disabled={!adding.trim() || act.busy}
               onClick={() => void act.run(`/settings/lists/${listKey}`, 'POST', { value: adding }).then((ok) => ok && setAdding(''))}>Add</button>
           </div>
-          <span className="muted small">Renaming updates every record that uses the option. Retiring hides it from dropdowns; records that already use it keep it.</span>
+          <span className="muted small">Drag ⠿ or use ↑ ↓ to reorder. Renaming updates every record that uses the option. Retiring hides it from dropdowns; records that already use it keep it.</span>
         </>
       ) : <span className="muted small">Only admins change controlled lists.</span>}
     </section>
@@ -533,7 +548,7 @@ export default function Settings() {
         { value: 'log', label: 'Change log' },
       ]} />
       {needsView && <ErrorBanner error={settings.error} />}
-      {needsView && !current && !settings.error && <div className="loading">Loading settings…</div>}
+      {needsView && !current && !settings.error && <div className="loading" data-label="Loading settings…">Loading settings…</div>}
       {tab === 'lists' && current && <ListsTab view={current} onView={setView} />}
       {tab === 'reminders' && current && <RemindersTab view={current} onView={setView} />}
       {tab === 'roles' && <RolesTab />}

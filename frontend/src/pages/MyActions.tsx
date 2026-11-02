@@ -7,7 +7,7 @@ import { ApiError, api } from '../api'
 import { fmtDate } from '../format'
 import { useSession } from '../session'
 import type { ActionItem, ActionKind, ActionsResponse, FormValues } from '../types'
-import { Banner, ErrorBanner, NextActionFields, Segmented, SelectField, TextField, useLoad } from '../ui'
+import { Banner, CountUp, ErrorBanner, NextActionFields, Segmented, SelectField, TextField, useLoad } from '../ui'
 
 type Mode = 'complete' | 'reschedule' | 'revisit'
 type Outcome = 'reactivate' | 'extend' | 'lost'
@@ -107,8 +107,9 @@ function baseDueText(i: ActionItem, at: string): string {
   return `Due today${at}`
 }
 
-function Section({ title, note, tone, items, team, onOpen }: {
+function Section({ title, note, tone, items, team, onOpen, leaving }: {
   title: string; note: string; tone: { bg: string; fg: string }; items: ActionItem[]; team: boolean; onOpen: (i: ActionItem, m: Mode) => void
+  leaving: string | null
 }) {
   return (
     <section className="section" aria-label={title}>
@@ -120,7 +121,7 @@ function Section({ title, note, tone, items, team, onOpen }: {
       {items.map((i) => {
         const k = KIND[i.kind]
         return (
-          <div className="action-row" key={`${i.kind}-${i.id}`}>
+          <div className={`action-row${leaving === `${i.kind}-${i.id}` ? ' leaving' : ''}`} key={`${i.kind}-${i.id}`}>
             <span className={`pill pill-${k.pill}`}>{k.label}</span>
             <div className="who">
               <Link to={k.path + i.id} style={{ fontWeight: 600 }}>{i.title}</Link>
@@ -152,6 +153,7 @@ export default function MyActions() {
   const [scope, setScope] = useState<Scope>('me')
   const [panel, setPanel] = useState<{ item: ActionItem; mode: Mode } | null>(null)
   const [toast, setToast] = useState('')
+  const [leaving, setLeaving] = useState<string | null>(null)
   const { data, error, loading, reload } = useLoad(() => api<ActionsResponse>('/actions', { params: { scope } }), [scope])
   const manager = user.role !== 'salesperson'
   const open = (item: ActionItem, mode: Mode) => setPanel({ item, mode })
@@ -168,20 +170,26 @@ export default function MyActions() {
       </div>
       {toast && <Banner onClose={() => setToast('')}>{toast}</Banner>}
       <ErrorBanner error={error} />
-      {loading && !data && <div className="loading">Loading actions…</div>}
+      {loading && !data && <div className="loading" data-label="Loading actions…">Loading actions…</div>}
       {data && <>
         <section className="tiles" aria-label="Summary">
-          <div className="tile"><span className="k">Overdue</span><span className="v" style={{ color: data.counts.overdue ? 'var(--red-ink)' : undefined }}>{data.counts.overdue}</span><span className="s">{data.counts.escalated} escalated</span></div>
-          <div className="tile"><span className="k">Due today</span><span className="v">{data.counts.today}</span><span className="s">{fmtDate(data.as_of)}</span></div>
-          <div className="tile"><span className="k">Next 7 days</span><span className="v">{data.counts.next_7_days}</span><span className="s">Upcoming actions</span></div>
-          <div className="tile"><span className="k">Nurture revisits</span><span className="v" style={{ color: 'var(--purple-ink)' }}>{data.counts.nurture}</span><span className="s">Excluded from active forecast</span></div>
+          <div className="tile"><span className="k">Overdue</span><span className="v" style={{ color: data.counts.overdue ? 'var(--red-ink)' : undefined }}><CountUp value={data.counts.overdue} /></span><span className="s">{data.counts.escalated} escalated</span></div>
+          <div className="tile"><span className="k">Due today</span><span className="v"><CountUp value={data.counts.today} /></span><span className="s">{fmtDate(data.as_of)}</span></div>
+          <div className="tile"><span className="k">Next 7 days</span><span className="v"><CountUp value={data.counts.next_7_days} /></span><span className="s">Upcoming actions</span></div>
+          <div className="tile"><span className="k">Nurture revisits</span><span className="v" style={{ color: 'var(--purple-ink)' }}><CountUp value={data.counts.nurture} /></span><span className="s">Excluded from active forecast</span></div>
         </section>
         {panel && <ActionPanel key={`${panel.item.id}-${panel.mode}`} item={panel.item} mode={panel.mode} onCancel={() => setPanel(null)}
-          onDone={(msg) => { setPanel(null); setToast(msg); void reload() }} />}
-        <Section title="Overdue" note="Stays until completed, rescheduled or closed" tone={{ bg: 'var(--red-soft)', fg: 'var(--red-ink)' }} items={data.overdue} team={scope === 'team'} onOpen={open} />
-        <Section title="Due today" note="Reminder on the due date" tone={{ bg: 'var(--amber-soft)', fg: 'var(--amber-ink)' }} items={data.today} team={scope === 'team'} onOpen={open} />
-        <Section title="Upcoming" note="Next actions after today" tone={{ bg: 'var(--paper-row)', fg: 'var(--ink)' }} items={data.upcoming} team={scope === 'team'} onOpen={open} />
-        <Section title="Nurture revisits" note="Routine reminders paused; one reminder on the revisit date" tone={{ bg: 'var(--purple-soft)', fg: 'var(--purple-ink)' }} items={data.nurture} team={scope === 'team'} onOpen={open} />
+          onDone={(msg) => {
+            // Let the handled row slide out before the list refreshes.
+            setLeaving(`${panel.item.kind}-${panel.item.id}`)
+            setPanel(null)
+            setToast(msg)
+            window.setTimeout(() => { setLeaving(null); void reload() }, 280)
+          }} />}
+        <Section title="Overdue" note="Stays until completed, rescheduled or closed" tone={{ bg: 'var(--red-soft)', fg: 'var(--red-ink)' }} items={data.overdue} team={scope === 'team'} onOpen={open} leaving={leaving} />
+        <Section title="Due today" note="Reminder on the due date" tone={{ bg: 'var(--amber-soft)', fg: 'var(--amber-ink)' }} items={data.today} team={scope === 'team'} onOpen={open} leaving={leaving} />
+        <Section title="Upcoming" note="Next actions after today" tone={{ bg: 'var(--paper-row)', fg: 'var(--ink)' }} items={data.upcoming} team={scope === 'team'} onOpen={open} leaving={leaving} />
+        <Section title="Nurture revisits" note="Routine reminders paused; one reminder on the revisit date" tone={{ bg: 'var(--purple-soft)', fg: 'var(--purple-ink)' }} items={data.nurture} team={scope === 'team'} onOpen={open} leaving={leaving} />
       </>}
     </>
   )

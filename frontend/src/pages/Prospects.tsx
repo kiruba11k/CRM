@@ -5,7 +5,7 @@ import { ApiError, api, downloadCsv } from '../api'
 import { fmtDate, nextActionLabel, todayIso } from '../format'
 import { useSession } from '../session'
 import type { Prospect } from '../types'
-import { ErrorBanner, SelectField, StatusPill, Tabs, TextField, useLoad } from '../ui'
+import { CountUp, ErrorBanner, SelectField, StatusPill, Tabs, TextField, useLoad } from '../ui'
 
 type Scope = 'mine' | 'all' | 'unlinked'
 interface Filters { status: string | null; country: string | null; source: string | null; next_action: string | null; q: string }
@@ -42,7 +42,7 @@ export default function Prospects() {
             style={{ textAlign: 'left', cursor: 'pointer', borderColor: f.status === s ? 'var(--ink)' : undefined }}
             onClick={() => setF({ ...f, status: f.status === s ? null : s })}>
             <span className="k"><StatusPill status={s} /></span>
-            <span className="v">{rows.filter((p) => p.status === s).length}</span>
+            <span className="v"><CountUp value={rows.filter((p) => p.status === s).length} /></span>
           </button>
         ))}
       </section>
@@ -60,7 +60,7 @@ export default function Prospects() {
       </div>
 
       <ErrorBanner error={error} />
-      {loading && !data ? <div className="loading">Loading prospects…</div> : (
+      {loading && !data ? <div className="loading" data-label="Loading prospects…">Loading prospects…</div> : (
         <div className="table-wrap">
           <table style={{ minWidth: 1000 }}>
             <thead><tr><th>Name</th><th>Account</th><th>Status</th><th>Source</th><th>Geography</th><th>Owner</th><th>Next action · due</th></tr></thead>
