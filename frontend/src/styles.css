@@ -611,3 +611,23 @@ main.main:has(.bulk-bar) { padding-bottom: 140px; }
 .sv-menu button.danger { color: var(--red-ink); }
 .sv-save { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-row); }
 .sv-save .input { flex: 1 1 260px; min-height: 40px; }
+
+/* Duplicates */
+.dup-list { display: flex; flex-direction: column; gap: 14px; }
+.dup-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dup-score { font-size: 12px; font-weight: 800; padding: 3px 10px; border-radius: 999px; }
+.dup-score.high { background: var(--red-soft); color: var(--red-ink); }
+.dup-score.mid { background: var(--amber-soft); color: var(--amber-ink); }
+.dup-score.low { background: var(--paper); color: var(--ink-soft); }
+.dup-cards { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: stretch; }
+.dup-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; background: var(--paper-row); }
+.dup-card .dup-name { font-weight: 700; font-size: 15px; }
+.dup-vs { align-self: center; font-size: 20px; color: var(--ink-soft); }
+.dup-compare { display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+.dup-table { min-width: 640px; }
+.dup-table th { white-space: normal; }
+.dup-keep { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; font-weight: 700; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.dup-val { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+.dup-val.on { background: var(--accent-soft); border-color: var(--accent); }
+.dup-val span { white-space: pre-wrap; word-break: break-word; }
+@media (max-width: 640px) { .dup-cards { grid-template-columns: minmax(0, 1fr); } .dup-vs { justify-self: center; transform: rotate(90deg); } }

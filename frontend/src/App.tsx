@@ -34,7 +34,7 @@ const NAV: NavItem[][] = [
   [
     ['/views', 'Forecast & views', 'Forecast', 'M3 3v18h18M7 15l4-4 3 3 5-6'],
     ['/reports', 'Reports', 'Reports', 'M4 20V10M10 20V4M16 20v-8M22 20H2'],
-    ['/cleanup', 'Needs cleanup', 'Cleanup', 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0'],
+    ['/cleanup', 'Cleanup & duplicates', 'Cleanup', 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0'],
   ],
   [
     ['/meetings', 'Meetings & booking', 'Meetings', 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2'],

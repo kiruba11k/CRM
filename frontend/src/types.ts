@@ -228,3 +228,15 @@ export interface SavedView {
   id: string; page: SavedViewPage; name: string; filters: Record<string, unknown>; shared: boolean
   owner_id: string; owner_name: string; mine: boolean; is_default: boolean; updated_at: string
 }
+
+// Duplicates
+export type DupEntity = 'accounts' | 'prospects'
+export interface DupRecord {
+  id: string; name?: string; full_name?: string; country?: string; website?: string | null; linkedin_url?: string | null
+  email?: string | null; phone?: string | null; job_title?: string | null; account_name?: string | null; status?: string
+  owner_name?: string | null; prospects?: number; deals?: number; created_at: string; [k: string]: unknown
+}
+export interface DupPair { a: DupRecord; b: DupRecord; score: number; reasons: string[] }
+export interface DupList { entity: DupEntity; count: number; pairs: DupPair[]; can_merge: boolean }
+export interface DupCompare { fields: string[]; a: DupRecord; b: DupRecord }
+export interface MergeEntry { id: number; entity_type: 'account' | 'prospect'; kept_id: string; kept_name: string; merged_name: string; moved: Record<string, number>; merged_at: string; merged_by: string | null }

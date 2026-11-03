@@ -40,6 +40,7 @@ export default function Accounts() {
           <p>One record per company. Each account can have many prospects and many opportunities.</p>
         </div>
         <div className="row">
+          <Link className="btn" to="/cleanup?tab=duplicates">Find duplicates</Link>
           <Link className="btn" to="/import?entity=accounts">Import CSV</Link>
           <button type="button" className="btn" onClick={() => downloadCsv('accounts').catch((e: ApiError) => setExportError(e))}>Export CSV</button>
         </div>
