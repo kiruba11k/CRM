@@ -4,6 +4,7 @@ import { Avatar, SortTh, useSort } from '../theme'
 import { ApiError, api, downloadCsv } from '../api'
 import { useSession } from '../session'
 import type { Account } from '../types'
+import { BulkBar, RowBox, SelectAllBox, useSelection } from '../components/Bulk'
 import { ErrorBanner, SelectField, Tabs, TextField, useLoad } from '../ui'
 
 const STATUS_PILL: Record<string, string> = { Target: 'blue', 'Active customer': 'teal', 'Inactive / do not pursue': 'paper' }
@@ -14,7 +15,7 @@ export default function Accounts() {
   const [country, setCountry] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [exportError, setExportError] = useState<ApiError | null>(null)
-  const { data, error, loading } = useLoad(() => api<Account[]>('/accounts'), [])
+  const { data, error, loading, reload } = useLoad(() => api<Account[]>('/accounts'), [])
   const rows = useMemo(() => data || [], [data])
   const filtered = useMemo(() => rows.filter((a) => (status === 'all' || a.status === status) && (!country || a.country === country)
     && (!q || `${a.name} ${a.industry || ''}`.toLowerCase().includes(q.toLowerCase()))), [rows, status, country, q])
@@ -24,6 +25,7 @@ export default function Accounts() {
     name: (a) => a.name, status: (a) => a.status, country: (a) => a.country, owner: (a) => a.owner_name,
     prospects: (a) => a.prospect_count ?? 0, open: (a) => a.open_count ?? 0, won: (a) => a.won_count ?? 0,
   })
+  const sel = useSelection(useMemo(() => sorted.map((a) => a.id), [sorted]))
 
   return (
     <>
@@ -49,6 +51,7 @@ export default function Accounts() {
         <div className="table-wrap">
           <table style={{ minWidth: 860 }}>
             <thead><tr>
+              <SelectAllBox sel={sel} label="accounts shown" />
               <SortTh label="Account" k="name" sort={sort} by={by} /><SortTh label="Status" k="status" sort={sort} by={by} />
               <SortTh label="Geography" k="country" sort={sort} by={by} /><SortTh label="Owner" k="owner" sort={sort} by={by} />
               <SortTh label="Prospects" k="prospects" sort={sort} by={by} num /><SortTh label="Open opportunities" k="open" sort={sort} by={by} num />
@@ -56,7 +59,8 @@ export default function Accounts() {
             </tr></thead>
             <tbody>
               {sorted.map((a) => (
-                <tr key={a.id} className="row-link" onClick={(e) => { if (!(e.target as HTMLElement).closest('a')) navigate(`/accounts/${a.id}`) }}>
+                <tr key={a.id} className={`row-link${sel.has(a.id) ? ' row-selected' : ''}`} onClick={(e) => { if (!(e.target as HTMLElement).closest('a')) navigate(`/accounts/${a.id}`) }}>
+                  <RowBox sel={sel} id={a.id} label={a.name} />
                   <td><Link to={`/accounts/${a.id}`} style={{ fontWeight: 600 }}>{a.name}</Link><div className="sub">{a.industry}</div></td>
                   <td><span className={`pill pill-${STATUS_PILL[a.status] || 'grey'}`}>{a.status}</span></td>
                   <td className="muted">{a.country}{a.region ? ` · ${a.region}` : ''}</td>
@@ -71,6 +75,7 @@ export default function Accounts() {
           {filtered.length === 0 && <div className="empty">No accounts match. Use “+ Account” to add one.</div>}
         </div>
       )}
+      <BulkBar entity="accounts" sel={sel} onDone={() => void reload()} />
     </>
   )
 }

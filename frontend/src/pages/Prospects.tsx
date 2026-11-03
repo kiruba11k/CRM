@@ -6,6 +6,7 @@ import { ApiError, api, downloadCsv } from '../api'
 import { fmtDate, nextActionLabel, todayIso } from '../format'
 import { useSession } from '../session'
 import type { Prospect } from '../types'
+import { BulkBar, RowBox, SelectAllBox, useSelection } from '../components/Bulk'
 import { CountUp, ErrorBanner, SelectField, StatusPill, Tabs, TextField, useLoad } from '../ui'
 
 type Scope = 'mine' | 'all' | 'unlinked'
@@ -16,7 +17,7 @@ export default function Prospects() {
   const [scope, setScope] = useState<Scope>('mine')
   const [f, setF] = useState<Filters>({ status: null, country: null, source: null, next_action: null, q: '' })
   const [exportError, setExportError] = useState<ApiError | null>(null)
-  const { data, error, loading } = useLoad(() => api<Prospect[]>('/prospects', { params: { scope } }), [scope])
+  const { data, error, loading, reload } = useLoad(() => api<Prospect[]>('/prospects', { params: { scope } }), [scope])
   const today = todayIso()
 
   const rows = useMemo(() => data || [], [data])
@@ -30,6 +31,7 @@ export default function Prospects() {
     name: (p) => p.full_name, account: (p) => p.account_name, status: (p) => lists.prospect_statuses.indexOf(p.status),
     source: (p) => p.source, geo: (p) => p.geography, owner: (p) => p.owner_name, due: (p) => p.next_action_due,
   })
+  const sel = useSelection(useMemo(() => sorted.map((p) => p.id), [sorted]))
 
   return (
     <>
@@ -73,6 +75,7 @@ export default function Prospects() {
         <div className="table-wrap">
           <table style={{ minWidth: 1000 }}>
             <thead><tr>
+              <SelectAllBox sel={sel} label="prospects shown" />
               <SortTh label="Name" k="name" sort={sort} by={by} /><SortTh label="Account" k="account" sort={sort} by={by} />
               <SortTh label="Status" k="status" sort={sort} by={by} /><SortTh label="Source" k="source" sort={sort} by={by} />
               <SortTh label="Geography" k="geo" sort={sort} by={by} /><SortTh label="Owner" k="owner" sort={sort} by={by} />
@@ -83,7 +86,8 @@ export default function Prospects() {
                 const closed = p.status === 'Disqualified'
                 const overdue = !closed && !!p.next_action_due && p.next_action_due < today
                 return (
-                  <tr key={p.id} className="row-link" onClick={(e) => { if (!(e.target as HTMLElement).closest('a')) navigate(`/prospects/${p.id}`) }}>
+                  <tr key={p.id} className={`row-link${sel.has(p.id) ? ' row-selected' : ''}`} onClick={(e) => { if (!(e.target as HTMLElement).closest('a')) navigate(`/prospects/${p.id}`) }}>
+                    <RowBox sel={sel} id={p.id} label={p.full_name} />
                     <td><Link to={`/prospects/${p.id}`} style={{ fontWeight: 600 }}>{p.full_name}</Link><div className="sub">{p.job_title}</div></td>
                     <td>{p.account_id ? <Link to={`/accounts/${p.account_id}`}>{p.account_name}</Link> : <span className="pill pill-amber">Unlinked</span>}</td>
                     <td><StatusPill status={p.status} /></td>
@@ -104,6 +108,7 @@ export default function Prospects() {
           {filtered.length === 0 && <div className="empty">No prospects match. Use “+ Prospect” to add one.</div>}
         </div>
       )}
+      <BulkBar entity="prospects" sel={sel} onDone={() => void reload()} />
     </>
   )
 }

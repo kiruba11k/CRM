@@ -1,6 +1,7 @@
 // §7 saved views: Active forecast, Nurture pipeline, High-risk deals,
 // Proposal planning, Closed deals. All read the same opportunity records.
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { BulkBar, RowBox, SelectAllBox, useSelection } from '../components/Bulk'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { fmtDate, money, moneyByCurrency, totalsByCurrency } from '../format'
@@ -18,14 +19,16 @@ const VIEWS: Record<View, { label: string; desc: string }> = {
 
 interface Row { o: Opportunity; cells: ReactNode[] }
 
-function Table({ cols, rows }: { cols: string[]; rows: Row[] }) {
+function Table({ cols, rows, onChanged }: { cols: string[]; rows: Row[]; onChanged: () => void }) {
+  const sel = useSelection(useMemo(() => rows.map((r) => r.o.id), [rows]))
   return (
     <div className="table-wrap">
       <table style={{ minWidth: 900 }}>
-        <thead><tr><th>Opportunity</th>{cols.map((c) => <th key={c}>{c}</th>)}</tr></thead>
+        <thead><tr><SelectAllBox sel={sel} label="deals shown" /><th>Opportunity</th>{cols.map((c) => <th key={c}>{c}</th>)}</tr></thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.o.id}>
+            <tr key={r.o.id} className={sel.has(r.o.id) ? 'row-selected' : undefined}>
+              <RowBox sel={sel} id={r.o.id} label={r.o.name} />
               <td><Link to={`/opportunities/${r.o.id}`} style={{ fontWeight: 600 }}>{r.o.name}</Link><div className="sub">{r.o.account_name} · {r.o.owner_name}</div></td>
               {r.cells.map((c, i) => <td key={i}>{c}</td>)}
             </tr>
@@ -33,6 +36,7 @@ function Table({ cols, rows }: { cols: string[]; rows: Row[] }) {
         </tbody>
       </table>
       {rows.length === 0 && <div className="empty">Nothing in this view.</div>}
+      <BulkBar entity="opportunities" sel={sel} onDone={onChanged} />
     </div>
   )
 }
@@ -59,24 +63,24 @@ export default function Views() {
         <div className="tile" key={p.period}><span className="k">{p.period} · {p.count} open</span><span className="v" style={{ fontSize: 16 }}>{moneyByCurrency(p.unweighted)}</span><span className="s">weighted {moneyByCurrency(p.weighted)}</span></div>
       ))}
     </section>
-    <Table cols={['Stage', 'Probability', 'Expected close', 'Unweighted', 'Weighted']}
+    <Table onChanged={() => { void all.reload(); void forecast.reload() }} cols={['Stage', 'Probability', 'Expected close', 'Unweighted', 'Weighted']}
       rows={lists.forecast.map((o) => ({ o, cells: [o.stage, `${o.probability}%`, fmtDate(o.expected_close), money(o.estimated_value, o.currency), money(o.weighted_value, o.currency)] }))} />
   </>
   if (view === 'nurture') body = <>
     <div className="tile" style={{ maxWidth: 360 }}><span className="k">Nurtured value</span><span className="v" style={{ fontSize: 18 }}>{moneyByCurrency(totalsByCurrency(lists.nurture, (o) => o.estimated_value))}</span></div>
-    <Table cols={['Stage (kept)', 'Value', 'Reason', 'Revisit date']}
+    <Table onChanged={() => { void all.reload(); void forecast.reload() }} cols={['Stage (kept)', 'Value', 'Reason', 'Revisit date']}
       rows={lists.nurture.map((o) => ({ o, cells: [o.stage, money(o.estimated_value, o.currency), o.nurture_reason, fmtDate(o.nurture_until)] }))} />
   </>
-  if (view === 'risk') body = <Table cols={['Stage', 'Risk reason', 'Mitigation', 'Expected close', 'Next action']}
+  if (view === 'risk') body = <Table onChanged={() => { void all.reload(); void forecast.reload() }} cols={['Stage', 'Risk reason', 'Mitigation', 'Expected close', 'Next action']}
     rows={lists.risk.map((o) => ({ o, cells: [o.stage, o.high_risk_reason, o.risk_mitigation, fmtDate(o.expected_close), o.on_nurture ? 'On nurture' : `${o.next_action_label} · ${fmtDate(o.next_action_due)}`] }))} />
-  if (view === 'proposals') body = <Table cols={['Stage', 'Proposal due', 'Delivery lead', 'Effort estimate']}
+  if (view === 'proposals') body = <Table onChanged={() => { void all.reload(); void forecast.reload() }} cols={['Stage', 'Proposal due', 'Delivery lead', 'Effort estimate']}
     rows={lists.proposals.map((o) => ({ o, cells: [o.stage, fmtDate(o.proposal_due), o.delivery_lead || '—', o.effort_estimate || '—'] }))} />
   if (view === 'closed') body = <>
     <section className="tiles">
       <div className="tile"><span className="k">Won · actual value</span><span className="v" style={{ fontSize: 18 }}>{moneyByCurrency(totalsByCurrency(won, (o) => o.actual_value))}</span></div>
       <div className="tile"><span className="k">Win rate</span><span className="v">{lists.closed.length ? Math.round(100 * won.length / lists.closed.length) : 0}%</span><span className="s">{won.length} won ÷ {lists.closed.length} closed (all time)</span></div>
     </section>
-    <Table cols={['Outcome', 'Actual value', 'Original estimate', 'Closed', 'Lost reason']}
+    <Table onChanged={() => { void all.reload(); void forecast.reload() }} cols={['Outcome', 'Actual value', 'Original estimate', 'Closed', 'Lost reason']}
       rows={lists.closed.map((o) => ({ o, cells: [o.stage, o.stage === 'Won' ? money(o.actual_value, o.currency) : '—', money(o.estimated_value, o.currency), fmtDate(o.won_date || o.lost_date), o.lost_reason ? `${o.lost_reason}${o.lost_notes ? `: ${o.lost_notes}` : ''}` : '—'] }))} />
   </>
 
