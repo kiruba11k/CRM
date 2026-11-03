@@ -43,6 +43,11 @@ async def my_actions(
 ):
     today = as_of or date.today()
     owner = UUID(user.id) if scope == "me" else None
+    return {"as_of": today, "scope": scope, **await collect(con, owner, today)}
+
+
+async def collect(con: asyncpg.Connection, owner: Optional[UUID], today: date) -> dict:
+    """Open next actions for one owner (or everyone), grouped by urgency."""
     sections = {"overdue": [], "today": [], "upcoming": [], "nurture": []}
     rem = domain.REMINDERS
     for r in await con.fetch(_SQL, owner):
@@ -67,4 +72,4 @@ async def my_actions(
     counts["next_7_days"] = sum(1 for i in sections["upcoming"] if i["days_until"] <= 7)
     counts["escalated"] = sum(1 for i in sections["overdue"] if i["escalated"])
     counts["due_next_business_day"] = sum(1 for i in sections["upcoming"] if i["due_next_business_day"])
-    return {"as_of": today, "scope": scope, "counts": counts, **sections}
+    return {"counts": counts, **sections}

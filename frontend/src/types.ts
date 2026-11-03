@@ -25,7 +25,10 @@ export interface Lists {
 }
 
 export type EditableList = 'sources' | 'nurture_reasons' | 'lost_reasons' | 'service_lines' | 'account_statuses' | 'currencies'
-export interface ReminderSettings { meeting_15: boolean; meeting_day: boolean; due_before: boolean; escalation: boolean; escalation_days: number }
+export interface ReminderSettings {
+  meeting_15: boolean; meeting_day: boolean; due_before: boolean; escalation: boolean; escalation_days: number
+  stale_days: number; digest: boolean; digest_hour: number; digest_time_zone: string; digest_weekdays_only: boolean
+}
 export interface SettingsView {
   lists: Record<EditableList, { label: string; options: { value: string; active: boolean; in_use: number; protected: boolean }[] }>
   stages: { name: string; probability: number; editable: boolean; default: number }[]
@@ -172,3 +175,35 @@ export interface EmailThread {
 export type TaskSyncState = 'pending' | 'synced' | 'failed' | 'not_connected' | 'completed' | 'removed'
 export interface TaskLink { id: string; title: string; due: string; sync_status: TaskSyncState; sync_error: string | null; synced_at: string | null; owner_id: string }
 export interface TasksStatus { configured: boolean; connected: boolean; enabled: boolean; granted: boolean; counts: Partial<Record<TaskSyncState, number>> }
+
+// Going-quiet deal alerts
+export interface StaleDeal {
+  id: string; name: string; account_name: string; owner_id: string | null; owner_name: string | null; stage: string
+  currency: string; estimated_value: number | string | null; expected_close: string | null; last_touch: string
+  days_quiet: number; days_in_stage: number | null; close_pushes: number
+  reasons: { code: 'quiet' | 'overdue' | 'slipping'; label: string }[]
+}
+export interface StaleResponse { scope: 'me' | 'team'; stale_days: number; count: number; items: StaleDeal[] }
+
+// Quarterly targets
+export interface QuotaLine {
+  currency: string; target: number | string | null; won: number | string; pipeline: number | string; weighted: number | string
+  attainment: number | null; projected: number | null; gap: number | string | null
+}
+export interface QuotaRow {
+  user_id: string; name: string; role: string; active: boolean; won_count: number; pipeline_count: number
+  target: CurrencyTotals; by_currency: QuotaLine[]
+}
+export interface QuotaResponse {
+  period: string; start: string; end: string; current: boolean; days_total: number; days_elapsed: number
+  previous: string; next: string; this_quarter: string; can_edit: boolean
+  rows: QuotaRow[]; team: { by_currency: QuotaLine[] }
+}
+
+// Daily digest
+export interface DigestMe {
+  enabled: boolean; email: string; configured: boolean
+  schedule: { on: boolean; hour: number; time_zone: string; weekdays_only: boolean }
+  last: { digest_date: string; status: 'sending' | 'sent' | 'failed' | 'skipped'; detail: string | null; updated_at: string } | null
+}
+export interface DigestPreview { subject: string; html: string; text: string; worth_sending: boolean; counts: Record<string, number> }

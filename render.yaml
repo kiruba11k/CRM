@@ -36,6 +36,16 @@ services:
         generateValue: true   # encrypts stored Google refresh tokens; keep it stable
       - key: CRM_HUBSPOT_TOKEN
         sync: false   # HubSpot private app (read-only scopes); only needed for the import
+      - key: CRM_SMTP_HOST
+        sync: false   # daily digest email, e.g. smtp.gmail.com
+      - key: CRM_SMTP_PORT
+        value: "587"
+      - key: CRM_SMTP_USER
+        sync: false   # sending mailbox, e.g. crm@leadstrategus.com
+      - key: CRM_SMTP_PASSWORD
+        sync: false   # an app password for that mailbox
+      - key: CRM_CRON_SECRET
+        generateValue: true   # copy into the GitHub secret CRM_CRON_SECRET (daily-digest workflow)
 
   - type: web
     name: leadstrategus-crm

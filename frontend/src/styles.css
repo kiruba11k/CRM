@@ -495,3 +495,16 @@ tr.row-link:hover td { background: var(--accent-soft); }
 .filter-tile { text-align: left; cursor: pointer; font: inherit; color: inherit; }
 .filter-tile.on { box-shadow: inset 0 0 0 2px var(--accent), var(--shadow); }
 tr.mapped td:first-child { box-shadow: inset 3px 0 0 var(--teal); }
+
+/* Quotas and going-quiet alerts */
+.quota-bar { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
+.quota-bar .bar-track { overflow: visible; }
+.quota-pace { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); opacity: .55; border-radius: 2px; }
+.quota-input { width: 120px; }
+.quarter-lines { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.quiet-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--amber-soft); color: var(--amber-ink); }
+.digest-frame { width: 100%; height: 520px; border: 1px solid var(--line); border-radius: 10px; background: #f4f5fa; }
+.action-row.quiet-row { grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1.1fr) 200px auto; }
+.action-row.quiet-row .kind .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1180px) { .action-row.quiet-row { grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 640px) { .action-row.quiet-row { grid-template-columns: minmax(0, 1fr); } }

@@ -6,7 +6,8 @@ import { Link } from 'react-router-dom'
 import { ApiError, api } from '../api'
 import { fmtDate } from '../format'
 import { useSession } from '../session'
-import type { ActionItem, ActionKind, ActionsResponse, FormValues } from '../types'
+import type { ActionItem, ActionKind, ActionsResponse, FormValues, QuotaResponse, StaleResponse } from '../types'
+import { AttainmentBar, QuietDeals, lineMoney } from '../components/Insights'
 import { Banner, CountUp, ErrorBanner, NextActionFields, Segmented, SelectField, TextField, useLoad } from '../ui'
 
 type Mode = 'complete' | 'reschedule' | 'revisit'
@@ -158,6 +159,10 @@ export default function MyActions() {
   const [toast, setToast] = useState('')
   const [leaving, setLeaving] = useState<string | null>(null)
   const { data, error, loading, reload } = useLoad(() => api<ActionsResponse>('/actions', { params: { scope } }), [scope])
+  const stale = useLoad(() => api<StaleResponse>('/alerts/stale', { params: { scope } }), [scope])
+  const quota = useLoad(() => api<QuotaResponse>('/quotas'), [])
+  const mine = quota.data?.rows.find((r) => r.user_id === user.id)
+  const quarterLines = (mine?.by_currency || []).filter((l) => l.target || Number(l.won))
   const manager = user.role !== 'salesperson'
   const open = (item: ActionItem, mode: Mode) => setPanel({ item, mode })
 
@@ -181,16 +186,31 @@ export default function MyActions() {
           <div className="tile tile-badged"><span className="tile-badge tone-blue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2" /></svg></span><span className="k">Next 7 days</span><span className="v"><CountUp value={data.counts.next_7_days} /></span><span className="s">Upcoming actions</span></div>
           <div className="tile tile-badged"><span className="tile-badge tone-purple" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10ZM2 21c0-3 1.9-5.4 5.1-6" /></svg></span><span className="k">Nurture revisits</span><span className="v" style={{ color: 'var(--purple-ink)' }}><CountUp value={data.counts.nurture} /></span><span className="s">Excluded from active forecast</span></div>
         </section>
+        {quota.data && quarterLines.length > 0 && (
+          <section className="card" aria-label="Your quarter">
+            <div className="card-head"><h2>Your quarter · {quota.data.period}</h2>
+              <span className="muted small">{quota.data.days_total - quota.data.days_elapsed} days left · <Link to="/reports">Targets</Link></span></div>
+            <div className="quarter-lines">
+              {quarterLines.map((l) => (
+                <div key={l.currency} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span className="small"><strong>{lineMoney(l, 'won')}</strong> won{l.target ? <> of {lineMoney(l, 'target')}</> : ' (no target set)'}</span>
+                  {l.target ? <AttainmentBar line={l} expected={Math.round((quota.data!.days_elapsed / quota.data!.days_total) * 100)} /> : null}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         {panel && <ActionPanel key={`${panel.item.id}-${panel.mode}`} item={panel.item} mode={panel.mode} onCancel={() => setPanel(null)}
           onDone={(msg) => {
             // Let the handled row slide out before the list refreshes.
             setLeaving(`${panel.item.kind}-${panel.item.id}`)
             setPanel(null)
             setToast(msg)
-            window.setTimeout(() => { setLeaving(null); void reload() }, 280)
+            window.setTimeout(() => { setLeaving(null); void reload(); void stale.reload() }, 280)
           }} />}
         <Section title="Overdue" note="Stays until completed, rescheduled or closed" tone={{ bg: 'var(--red-soft)', fg: 'var(--red-ink)' }} items={data.overdue} team={scope === 'team'} onOpen={open} leaving={leaving} />
         <Section title="Due today" note="Reminder on the due date" tone={{ bg: 'var(--amber-soft)', fg: 'var(--amber-ink)' }} items={data.today} team={scope === 'team'} onOpen={open} leaving={leaving} />
+        {stale.data && <QuietDeals items={stale.data.items} team={scope === 'team'} staleDays={stale.data.stale_days} />}
         <Section title="Upcoming" note="Next actions after today" tone={{ bg: 'var(--paper-row)', fg: 'var(--ink)' }} items={data.upcoming} team={scope === 'team'} onOpen={open} leaving={leaving} />
         <Section title="Nurture revisits" note="Routine reminders paused; one reminder on the revisit date" tone={{ bg: 'var(--purple-soft)', fg: 'var(--purple-ink)' }} items={data.nurture} team={scope === 'team'} onOpen={open} leaving={leaving} />
       </>}

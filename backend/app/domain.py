@@ -103,6 +103,11 @@ DEFAULT_REMINDERS: dict[str, Any] = {
     "due_before": False,        # flag actions due the next business day
     "escalation": True,         # flag overdue actions to managers
     "escalation_days": ESCALATION_BUSINESS_DAYS,
+    "stale_days": 14,           # open deal with no activity this many days is "going quiet"
+    "digest": True,             # daily digest email (needs CRM_SMTP_* on the server)
+    "digest_hour": 8,           # local hour the digest goes out
+    "digest_time_zone": "UTC",  # IANA zone for digest_hour, e.g. Europe/London
+    "digest_weekdays_only": True,
 }
 REMINDERS: dict[str, Any] = dict(DEFAULT_REMINDERS)
 

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, api, downloadCsv } from '../api'
 import { fmtDateTime } from '../format'
 import { useSession } from '../session'
-import type { CalendarStatus, ChecklistItem, EditableList, ReminderSettings, Role, SettingsChange, SettingsView, User } from '../types'
+import type { CalendarStatus, ChecklistItem, DigestMe, DigestPreview, EditableList, ReminderSettings, Role, SettingsChange, SettingsView, User } from '../types'
 import { Banner, ErrorBanner, Tabs, TextField, useLoad } from '../ui'
 
 type Tab = 'lists' | 'reminders' | 'roles' | 'integrations' | 'data' | 'launch' | 'log'
@@ -219,6 +219,63 @@ const ALWAYS: [string, string][] = [
   ['Nurture revisit date', 'Reminder on the revisit date; no routine active-deal nudges while nurtured'],
 ]
 
+function timeZones(current: string): string[] {
+  let zones: string[] = []
+  try { zones = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') || [] } catch { /* old browser */ }
+  if (!zones.length) zones = ['UTC', 'Europe/London', 'Europe/Berlin', 'Europe/Stockholm', 'Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'America/New_York', 'America/Chicago', 'America/Los_Angeles']
+  return Array.from(new Set(['UTC', current, ...zones]))
+}
+
+// Everyone: their own digest switch, a preview, and a test send. Admins can
+// also send today's digests straight away.
+function DigestCard({ reminders }: { reminders: ReminderSettings }) {
+  const { user } = useSession()
+  const me = useLoad(() => api<DigestMe>('/digest/me'), [])
+  const [preview, setPreview] = useState<DigestPreview | null>(null)
+  const [msg, setMsg] = useState('')
+  const [error, setError] = useState<ApiError | null>(null)
+  const [busy, setBusy] = useState('')
+  const call = async <T,>(key: string, fn: () => Promise<T>): Promise<T | null> => {
+    setBusy(key); setError(null); setMsg('')
+    try { return await fn() } catch (e) { setError(e as ApiError); return null } finally { setBusy('') }
+  }
+  const d = me.data
+  const LAST: Record<string, string> = { sent: 'Sent', skipped: 'Not sent: nothing due', failed: 'Failed', sending: 'Sending' }
+  return (
+    <section className="card" aria-label="My daily digest">
+      <div className="card-head"><h2>My daily digest</h2>{d && <span className="muted small">to {d.email}</span>}</div>
+      <ErrorBanner error={error || me.error} onClose={() => setError(null)} />
+      {msg && <Banner onClose={() => setMsg('')}>{msg}</Banner>}
+      {d && !d.configured && <Banner kind="warn">Email isn’t set up on the server yet, so no digests go out. An admin adds CRM_SMTP_HOST, CRM_SMTP_USER and CRM_SMTP_PASSWORD on the Render API service. You can still preview yours.</Banner>}
+      {d && <>
+        <div className="list-row">
+          <span style={{ flex: '1 1 320px' }}><strong>Send me the daily digest</strong><br /><span className="muted small">
+            {reminders.digest ? `Around ${String(reminders.digest_hour).padStart(2, '0')}:00 ${reminders.digest_time_zone}${reminders.digest_weekdays_only ? ' on weekdays' : ''}` : 'Turned off for everyone by an admin'}
+            {d.last ? ` · Last: ${LAST[d.last.status] || d.last.status} (${d.last.digest_date})${d.last.status === 'failed' && d.last.detail ? `: ${d.last.detail}` : ''}` : ''}
+          </span></span>
+          <label className="check"><input type="checkbox" checked={d.enabled} disabled={busy === 'pref'}
+            onChange={(e) => { const enabled = e.target.checked; void call('pref', () => api<DigestMe>('/digest/me', { method: 'PATCH', body: { enabled } })).then((r) => { if (r) void me.reload() }) }} /> {d.enabled ? 'On' : 'Off'}</label>
+        </div>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-outline" disabled={!!busy} onClick={() => void call('preview', () => api<DigestPreview>('/digest/preview')).then((p) => p && setPreview(p))}>{busy === 'preview' ? 'Building…' : 'Preview today’s digest'}</button>
+          <button type="button" className="btn" disabled={!!busy || !d.configured} onClick={() => void call('test', () => api<{ sent_to: string }>('/digest/test', { method: 'POST', body: {} })).then((r) => r && setMsg(`Test digest sent to ${r.sent_to}.`))}>{busy === 'test' ? 'Sending…' : 'Email me a test'}</button>
+          {user.role === 'admin' && <button type="button" className="btn" disabled={!!busy || !d.configured}
+            onClick={() => void call('run', () => api<{ sent: number; skipped: number; failed: number; already: number }>('/digest/run', { method: 'POST', body: {} }))
+              .then((r) => { if (r) { setMsg(`Digests: ${r.sent} sent, ${r.skipped} with nothing due, ${r.already} already sent today${r.failed ? `, ${r.failed} failed` : ''}.`); void me.reload() } })}>
+            {busy === 'run' ? 'Sending…' : 'Send today’s digests now'}</button>}
+        </div>
+      </>}
+      {preview && <>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <span className="small"><strong>Subject:</strong> {preview.subject}{!preview.worth_sending && <span className="muted"> · nothing due, so this wouldn’t be sent today</span>}</span>
+          <button type="button" className="btn" onClick={() => setPreview(null)}>Close preview</button>
+        </div>
+        <iframe className="digest-frame" title="Digest preview" sandbox="" srcDoc={preview.html} />
+      </>}
+    </section>
+  )
+}
+
 function RemindersTab({ view, onView }: { view: SettingsView; onView: (v: SettingsView) => void }) {
   const { user } = useSession()
   const admin = user.role === 'admin'
@@ -231,6 +288,7 @@ function RemindersTab({ view, onView }: { view: SettingsView; onView: (v: Settin
     void act.run('/settings/reminders', 'PUT', patch).then((ok) => { if (!ok) setR(view.reminders) })
   }
   return (
+    <>
     <section className="card" aria-label="Reminders">
       <h2>Reminders (§5)</h2>
       <ErrorBanner error={act.error} onClose={() => act.setError(null)} />
@@ -252,6 +310,34 @@ function RemindersTab({ view, onView }: { view: SettingsView; onView: (v: Settin
             </select>
           ) : <span className="pill pill-grey">{r.escalation_days} business days</span>}
         </div>
+        <div className="list-row">
+          <span style={{ flex: '1 1 320px' }}><strong>Deal going quiet</strong><br /><span className="muted small">Flag an open deal on My Actions, the Pipeline and the digest when nothing has happened on it for this long</span></span>
+          {admin ? (
+            <select className="input" aria-label="Going quiet after days" value={r.stale_days} onChange={(e) => set({ stale_days: Number(e.target.value) })}>
+              {[7, 10, 14, 21, 30, 45, 60].map((n) => <option key={n} value={n}>{n} days</option>)}
+            </select>
+          ) : <span className="pill pill-grey">{r.stale_days} days</span>}
+        </div>
+        <div className="list-row">
+          <span style={{ flex: '1 1 320px' }}><strong>Daily digest email</strong><br /><span className="muted small">Each morning: overdue and due-today actions, deals going quiet and the quarter so far; managers also get a team summary. People with nothing due get no email.</span></span>
+          {admin ? (
+            <label className="check"><input type="checkbox" checked={!!r.digest} onChange={(e) => set({ digest: e.target.checked })} /> {r.digest ? 'On' : 'Off'}</label>
+          ) : <span className={`pill pill-${r.digest ? 'teal' : 'grey'}`}>{r.digest ? 'On' : 'Off'}</span>}
+        </div>
+        <div className="list-row">
+          <span style={{ flex: '1 1 320px' }}><strong>Digest send time</strong><br /><span className="muted small">Sent at or shortly after this hour, in this time zone</span></span>
+          {admin ? (
+            <span className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <select className="input" aria-label="Digest hour" value={r.digest_hour} disabled={!r.digest} onChange={(e) => set({ digest_hour: Number(e.target.value) })}>
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+              </select>
+              <select className="input" aria-label="Digest time zone" value={r.digest_time_zone} disabled={!r.digest} onChange={(e) => set({ digest_time_zone: e.target.value })}>
+                {timeZones(r.digest_time_zone).map((z) => <option key={z} value={z}>{z}</option>)}
+              </select>
+              <label className="check"><input type="checkbox" checked={!!r.digest_weekdays_only} disabled={!r.digest} onChange={(e) => set({ digest_weekdays_only: e.target.checked })} /> Weekdays only</label>
+            </span>
+          ) : <span className="pill pill-grey">{String(r.digest_hour).padStart(2, '0')}:00 {r.digest_time_zone}{r.digest_weekdays_only ? ', weekdays' : ''}</span>}
+        </div>
         {ALWAYS.map(([trigger, behaviour]) => (
           <div className="list-row" key={trigger}>
             <span style={{ flex: '1 1 320px' }}><strong>{trigger}</strong><br /><span className="muted small">{behaviour}</span></span>
@@ -262,6 +348,8 @@ function RemindersTab({ view, onView }: { view: SettingsView; onView: (v: Settin
       <p className="muted small" style={{ margin: 0 }}>Won, Lost and Disqualified records never get open-record reminders. Nurtured opportunities only get the revisit-date reminder. Meeting reminders are set on each meeting; these are the defaults new meetings start with.</p>
       {!admin && <span className="muted small">Only admins change reminder settings.</span>}
     </section>
+    <DigestCard reminders={r} />
+    </>
   )
 }
 

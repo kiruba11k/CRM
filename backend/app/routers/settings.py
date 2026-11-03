@@ -35,7 +35,10 @@ CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 REMINDER_LABELS = {
     "meeting_15": "15-minute meeting reminder", "meeting_day": "Day-before meeting reminder",
     "due_before": "Next-business-day flag", "escalation": "Manager escalation", "escalation_days": "Escalate after",
+    "stale_days": "Going-quiet alert after", "digest": "Daily digest email", "digest_hour": "Digest hour",
+    "digest_time_zone": "Digest time zone", "digest_weekdays_only": "Digest on weekdays only",
 }
+REMINDER_UNITS = {"escalation_days": "business day(s)", "stale_days": "day(s)", "digest_hour": ":00"}
 
 LAUNCH_ITEMS: list[tuple[str, str, str, str]] = [
     ("d_platform", "decision", "Build platform", "Custom build: FastAPI, Neon PostgreSQL, React + TypeScript, Render"),
@@ -95,6 +98,11 @@ class RemindersIn(_In):
     due_before: Optional[bool] = None
     escalation: Optional[bool] = None
     escalation_days: Optional[int] = None
+    stale_days: Optional[int] = None
+    digest: Optional[bool] = None
+    digest_hour: Optional[int] = None
+    digest_time_zone: Optional[str] = None
+    digest_weekdays_only: Optional[bool] = None
 
 
 class ChecklistPatch(_In):
@@ -260,11 +268,25 @@ async def set_reminders(body: RemindersIn, con: asyncpg.Connection = Depends(get
     patch = body.model_dump(exclude_unset=True, exclude_none=True)
     if "escalation_days" in patch and not 1 <= patch["escalation_days"] <= 20:
         raise HTTPException(422, "Escalate after 1 to 20 business days.")
+    if "stale_days" in patch and not 3 <= patch["stale_days"] <= 90:
+        raise HTTPException(422, "Flag deals as going quiet after 3 to 90 days.")
+    if "digest_hour" in patch and not 0 <= patch["digest_hour"] <= 23:
+        raise HTTPException(422, "Digest hour must be 0 to 23.")
+    if "digest_time_zone" in patch:
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        try:
+            ZoneInfo(patch["digest_time_zone"])
+        except (ZoneInfoNotFoundError, ValueError):
+            raise HTTPException(422, f"“{patch['digest_time_zone']}” isn’t a time zone. Use a name like Europe/London.")
     new = {**domain.REMINDERS, **patch}
     async with con.transaction():
         await listconfig.save_setting(con, "reminders", new, user.id)
-        show = lambda v: ("on" if v else "off") if isinstance(v, bool) else f"{v} business day(s)"  # noqa: E731
-        diff = [f"{REMINDER_LABELS[k]} {show(domain.REMINDERS[k])} → {show(v)}" for k, v in new.items() if domain.REMINDERS.get(k) != v]
+        def show(k: str, v) -> str:
+            if isinstance(v, bool):
+                return "on" if v else "off"
+            unit = REMINDER_UNITS.get(k)
+            return f"{v}{unit}" if unit == ":00" else f"{v} {unit}" if unit else str(v)
+        diff = [f"{REMINDER_LABELS[k]} {show(k, domain.REMINDERS.get(k))} → {show(k, v)}" for k, v in new.items() if domain.REMINDERS.get(k) != v]
         await _audit(con, "Reminders", ("Changed " + ", ".join(diff) + ".") if diff else "No change.", user)
     await _applied(con)
     return await get_settings_view(con, user)

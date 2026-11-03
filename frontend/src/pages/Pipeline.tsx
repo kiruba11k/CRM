@@ -13,7 +13,7 @@ import { Avatar, STAGE_COLOR } from '../theme'
 import { useToast } from '../components/Toast'
 import { fmtDate, money, moneyByCurrency, todayIso, totalsByCurrency } from '../format'
 import { useSession } from '../session'
-import type { FieldErrors, Opportunity, PipelineReport } from '../types'
+import type { FieldErrors, Opportunity, PipelineReport, StaleResponse } from '../types'
 import { ErrorBanner, RiskPill, SelectField, useLoad } from '../ui'
 
 
@@ -31,6 +31,8 @@ export default function Pipeline() {
   const [f, setF] = useState<Filters>({ owner: null, risk: null, service: null })
   const { data, error, loading } = useLoad(() => api<Opportunity[]>('/opportunities', { params: { include_nurtured: true } }), [])
   const report = useLoad(() => api<PipelineReport>('/reports/pipeline'), [])
+  const stale = useLoad(() => api<StaleResponse>('/alerts/stale', { params: { scope: 'team' } }), [])
+  const quiet = useMemo(() => new Map((stale.data?.items || []).map((d) => [d.id, d])), [stale.data])
   const today = todayIso()
   const toast = useToast()
   const [rows, setRows] = useState<Opportunity[] | null>(null)
@@ -48,6 +50,7 @@ export default function Pipeline() {
     if (saved.stage === 'Won' && before.stage !== 'Won') setBurst((b) => b + 1)
     window.setTimeout(() => setLanded((l) => (l === saved.id ? null : l)), 700)
     void report.reload()
+    void stale.reload()
     toast(`Moved “${before.name}” to ${saved.stage}.`, undoable ? { action: { label: 'Undo', run: () => void move({ ...before, stage: saved.stage }, before.stage, false) } } : undefined)
   }
   async function move(o: Opportunity, stage: string, undoable = true) {
@@ -138,6 +141,9 @@ export default function Pipeline() {
                             <span className="row" style={{ gap: 6 }}>{o.on_nurture && <span className="pill pill-purple">Nurture</span>}<RiskPill risk={o.risk_rating} /></span>
                           </div>
                           <span className="small muted">Close {fmtDate(o.expected_close)}</span>
+                          {quiet.has(o.id) && <span className="quiet-chip" title={quiet.get(o.id)!.reasons.map((r) => r.label).join(' · ')}>
+                            ● {quiet.get(o.id)!.reasons[0].code === 'quiet' ? `Quiet ${quiet.get(o.id)!.days_quiet}d` : quiet.get(o.id)!.reasons[0].code === 'overdue' ? 'Close date passed' : 'Close date slipping'}
+                            {quiet.get(o.id)!.reasons.length > 1 ? ` +${quiet.get(o.id)!.reasons.length - 1}` : ''}</span>}
                           <span className="deal-foot" style={{ color: overdue ? 'var(--red-ink)' : 'var(--ink-soft)' }}>
                             <Avatar name={o.owner_name} size={24} />
                             {cardFooter(o, closed, overdue)}

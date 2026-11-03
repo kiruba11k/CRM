@@ -38,7 +38,7 @@ async def _truncate():
     con = await asyncpg.connect(RAW_DB)
     try:
         await con.execute(
-            "TRUNCATE task_links, email_threads, settings_changes, launch_checklist, app_settings, list_options, calendar_sync_log, meetings, calendar_connections, booking_links, import_runs, record_history, activities, opportunity_team, opportunities, prospects, accounts, users RESTART IDENTITY CASCADE"
+            "TRUNCATE quotas, digest_log, task_links, email_threads, settings_changes, launch_checklist, app_settings, list_options, calendar_sync_log, meetings, calendar_connections, booking_links, import_runs, record_history, activities, opportunity_team, opportunities, prospects, accounts, users RESTART IDENTITY CASCADE"
         )
     finally:
         await con.close()
@@ -107,3 +107,6 @@ class Api:
 
     def patch(self, url, body, as_=REP):
         return self.c.patch(url, json=body, headers=self._h(as_))
+
+    def put(self, url, body, as_=REP):
+        return self.c.put(url, json=body, headers=self._h(as_))

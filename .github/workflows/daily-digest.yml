@@ -1,0 +1,34 @@
+# Daily digest email trigger. Runs every hour; the API sends each person's
+# digest once per day, after the hour set in Settings → Reminders (in the
+# time zone set there), so most runs do nothing. Each call also wakes the
+# free Render API if it is asleep.
+#
+# Setup (GitHub → Settings → Secrets and variables → Actions):
+#   CRM_API_URL      e.g. https://leadstrategus-crm-api.onrender.com
+#   CRM_CRON_SECRET  same value as CRM_CRON_SECRET on the Render API service
+name: Daily digest
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ask the CRM to send due digests
+        env:
+          CRM_API_URL: ${{ secrets.CRM_API_URL }}
+          CRM_CRON_SECRET: ${{ secrets.CRM_CRON_SECRET }}
+        run: |
+          if [ -z "$CRM_API_URL" ] || [ -z "$CRM_CRON_SECRET" ]; then
+            echo "::notice::CRM_API_URL / CRM_CRON_SECRET secrets not set; skipping."
+            exit 0
+          fi
+          curl -fsS --retry 4 --retry-delay 20 --retry-all-errors --max-time 120 \
+            -X POST "${CRM_API_URL%/}/api/digest/cron" -H "X-Cron-Secret: $CRM_CRON_SECRET"
+          echo

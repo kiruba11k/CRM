@@ -8,6 +8,7 @@ import { useSession } from '../session'
 import type { ActionsResponse, Opportunity, PipelineReport, Prospect } from '../types'
 import { ErrorBanner, Segmented, Tabs, useLoad } from '../ui'
 import { stageColor } from '../theme'
+import Targets from '../components/Targets'
 
 type Win = '90' | 'quarter' | 'ytd'
 type Group = 'sales' | 'geo' | 'service'
@@ -116,6 +117,8 @@ export default function Reports() {
             <div className="tile" key={m.k}><span className="k">{m.k}</span><span className="v" style={m.v.includes('·') ? { fontSize: 18 } : undefined}>{m.v}</span><span className="s">{m.sub}</span></div>
           ))}
         </section>
+
+        <Targets />
 
         <div className="cols">
           <section className="card col-side" aria-label="Prospect funnel">

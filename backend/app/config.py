@@ -54,6 +54,21 @@ class Settings(BaseSettings):
     # another API instance.
     config_refresh_seconds: float = 15
 
+    # ── Daily digest email (SMTP) ──────────────────────────────────
+    # e.g. smtp.gmail.com / 587 / crm@leadstrategus.com / an app password.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    # Sender address; defaults to smtp_user.
+    mail_from: str = ""
+    # Shared secret the scheduled job sends (X-Cron-Secret) to trigger digests.
+    cron_secret: str = ""
+
+    @property
+    def smtp_sender(self) -> str:
+        return self.mail_from or self.smtp_user
+
     @property
     def admin_email_set(self) -> set[str]:
         return {e.strip().lower() for e in self.admin_emails.split(",") if e.strip()}
