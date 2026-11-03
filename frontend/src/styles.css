@@ -470,3 +470,14 @@ tr.row-link:hover td { background: var(--accent-soft); }
 /* The rail still scrolls on short windows, without a visible scrollbar. */
 .rail { scrollbar-width: none; }
 .rail::-webkit-scrollbar { display: none; }
+
+/* The rail scrolls up and down only: hidden tooltips must never make it
+   wider (that showed a sideways scrollbar and clipped the labels). */
+.rail { overflow-x: hidden; }
+.rail [data-tip]::after { display: none; }
+@media (hover: hover) and (min-width: 721px) and (min-height: 780px) {
+  /* Tall enough for the whole rail: no scrolling, so tooltips may show outside it. */
+  .rail { overflow: visible; }
+  .rail [data-tip]:hover::after, .rail [data-tip]:focus-visible::after { display: block; }
+}
+@media (max-width: 720px) { .rail { overflow-x: auto; overflow-y: hidden; } }
