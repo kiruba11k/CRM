@@ -9,6 +9,7 @@ import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import { FollowUpStatus, MeetingsCard, TaskStatus } from '../components/Meetings'
 import { GmailCard } from '../components/Gmail'
+import { StagePill } from '../theme'
 import type { Account, AccountDetail, FormValue, FormValues, Issue, OpportunityDetail, Prospect } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, TextField, WarningsBanner, changedFields, useLoad, withCurrent } from '../ui'
 
@@ -103,7 +104,7 @@ export default function OpportunityRecord() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <h1>{data.name}</h1>
           <div className="row">
-            <span className="pill" style={{ background: 'var(--ink)', color: 'var(--paper)' }}>{data.stage} · {data.probability}%</span>
+            <StagePill stage={data.stage} probability={data.probability} />
             <span className="mono" style={{ fontWeight: 600, fontSize: 16 }}>{money(data.estimated_value, data.currency)}</span>
             <span className="muted">weighted {money(data.weighted_value, data.currency)}</span>
             {data.on_nurture && <span className="pill pill-purple">On nurture: excluded from active forecast</span>}

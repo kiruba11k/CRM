@@ -1,6 +1,7 @@
 // §7 My Prospects: filter by status, geography, source and next action.
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { Avatar, SortTh, useSort } from '../theme'
 import { ApiError, api, downloadCsv } from '../api'
 import { fmtDate, nextActionLabel, todayIso } from '../format'
 import { useSession } from '../session'
@@ -24,6 +25,11 @@ export default function Prospects() {
     && (!f.next_action || p.next_action_code === f.next_action)
     && (!f.q || `${p.full_name} ${p.email || ''} ${p.account_name || ''}`.toLowerCase().includes(f.q.toLowerCase()))), [rows, f])
   const countries = [...new Set(rows.map((p) => p.geography).filter((g): g is string => !!g))].sort()
+  const navigate = useNavigate()
+  const { sorted, sort, by } = useSort(filtered, { key: 'due', dir: 'asc' }, {
+    name: (p) => p.full_name, account: (p) => p.account_name, status: (p) => lists.prospect_statuses.indexOf(p.status),
+    source: (p) => p.source, geo: (p) => p.geography, owner: (p) => p.owner_name, due: (p) => p.next_action_due,
+  })
 
   return (
     <>
@@ -63,19 +69,24 @@ export default function Prospects() {
       {loading && !data ? <div className="loading" data-label="Loading prospects…">Loading prospects…</div> : (
         <div className="table-wrap">
           <table style={{ minWidth: 1000 }}>
-            <thead><tr><th>Name</th><th>Account</th><th>Status</th><th>Source</th><th>Geography</th><th>Owner</th><th>Next action · due</th></tr></thead>
+            <thead><tr>
+              <SortTh label="Name" k="name" sort={sort} by={by} /><SortTh label="Account" k="account" sort={sort} by={by} />
+              <SortTh label="Status" k="status" sort={sort} by={by} /><SortTh label="Source" k="source" sort={sort} by={by} />
+              <SortTh label="Geography" k="geo" sort={sort} by={by} /><SortTh label="Owner" k="owner" sort={sort} by={by} />
+              <SortTh label="Next action · due" k="due" sort={sort} by={by} />
+            </tr></thead>
             <tbody>
-              {filtered.map((p) => {
+              {sorted.map((p) => {
                 const closed = p.status === 'Disqualified'
                 const overdue = !closed && !!p.next_action_due && p.next_action_due < today
                 return (
-                  <tr key={p.id}>
+                  <tr key={p.id} className="row-link" onClick={(e) => { if (!(e.target as HTMLElement).closest('a')) navigate(`/prospects/${p.id}`) }}>
                     <td><Link to={`/prospects/${p.id}`} style={{ fontWeight: 600 }}>{p.full_name}</Link><div className="sub">{p.job_title}</div></td>
                     <td>{p.account_id ? <Link to={`/accounts/${p.account_id}`}>{p.account_name}</Link> : <span className="pill pill-amber">Unlinked</span>}</td>
                     <td><StatusPill status={p.status} /></td>
                     <td className="muted">{p.source || '—'}</td>
                     <td className="muted">{p.geography || '—'}</td>
-                    <td className="muted">{p.owner_name || '—'}</td>
+                    <td className="muted">{p.owner_name ? <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}><Avatar name={p.owner_name} size={26} />{p.owner_name}</span> : '—'}</td>
                     <td>
                       <div>{closed ? 'None (closed)' : nextActionLabel(lists, p.next_action_code, p.next_action_other)}</div>
                       <div className="sub" style={{ color: overdue ? 'var(--red-ink)' : undefined, fontWeight: overdue ? 700 : 400 }}>

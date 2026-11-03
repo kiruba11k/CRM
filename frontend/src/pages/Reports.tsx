@@ -7,12 +7,12 @@ import { fmtDate, moneyByCurrency, totalsByCurrency, todayIso } from '../format'
 import { useSession } from '../session'
 import type { ActionsResponse, Opportunity, PipelineReport, Prospect } from '../types'
 import { ErrorBanner, Segmented, Tabs, useLoad } from '../ui'
+import { stageColor } from '../theme'
 
 type Win = '90' | 'quarter' | 'ytd'
 type Group = 'sales' | 'geo' | 'service'
 
 const FUNNEL_COLOR: Record<string, string> = { New: '#8A959C', Contacted: '#2E5EAA', Engaged: '#D99000', Qualified: '#0E7C6B', Nurture: '#7A4FB5', Disqualified: '#C93A2B' }
-const STAGE_COLOR = ['#8A959C', '#2E5EAA', '#0E7C6B', '#D99000', '#E85D3D', '#7A4FB5', '#5B3B8C']
 
 function windowStart(win: Win, today: string): string {
   const d = new Date(`${today}T00:00:00Z`)
@@ -132,10 +132,10 @@ export default function Reports() {
           <section className="card col-main" aria-label="Open pipeline by stage">
             <div className="card-head"><h2>Open pipeline by stage</h2><Link to="/pipeline" className="small">Open board</Link></div>
             {openStages.length === 0 && <p className="muted" style={{ margin: 0 }}>No open, non-nurtured opportunities.</p>}
-            {openStages.map((s, i) => (
+            {openStages.map((s) => (
               <div className="bar-row" key={s.stage}>
                 <span>{s.stage} <span className="muted small">· {s.probability}%</span></span>
-                <div className="bar-track"><div className="bar-fill" style={{ width: `${(s.count / Math.max(...openStages.map((x) => x.count))) * 100}%`, background: STAGE_COLOR[i % STAGE_COLOR.length] }} /></div>
+                <div className="bar-track"><div className="bar-fill" style={{ width: `${(s.count / Math.max(...openStages.map((x) => x.count))) * 100}%`, background: stageColor(s.stage) }} /></div>
                 <span className="small">{s.count} · {moneyByCurrency(s.unweighted)}</span>
               </div>
             ))}

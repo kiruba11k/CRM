@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { Avatar, SortTh, useSort } from '../theme'
 import { ApiError, api, downloadCsv } from '../api'
 import { useSession } from '../session'
 import type { Account } from '../types'
@@ -18,6 +19,11 @@ export default function Accounts() {
   const filtered = useMemo(() => rows.filter((a) => (status === 'all' || a.status === status) && (!country || a.country === country)
     && (!q || `${a.name} ${a.industry || ''}`.toLowerCase().includes(q.toLowerCase()))), [rows, status, country, q])
   const countries = [...new Set(rows.map((a) => a.country))].sort()
+  const navigate = useNavigate()
+  const { sorted, sort, by } = useSort(filtered, { key: 'name', dir: 'asc' }, {
+    name: (a) => a.name, status: (a) => a.status, country: (a) => a.country, owner: (a) => a.owner_name,
+    prospects: (a) => a.prospect_count ?? 0, open: (a) => a.open_count ?? 0, won: (a) => a.won_count ?? 0,
+  })
 
   return (
     <>
@@ -39,14 +45,19 @@ export default function Accounts() {
       {loading && !data ? <div className="loading" data-label="Loading accounts…">Loading accounts…</div> : (
         <div className="table-wrap">
           <table style={{ minWidth: 860 }}>
-            <thead><tr><th>Account</th><th>Status</th><th>Geography</th><th>Owner</th><th className="num">Prospects</th><th className="num">Open opportunities</th><th className="num">Won</th></tr></thead>
+            <thead><tr>
+              <SortTh label="Account" k="name" sort={sort} by={by} /><SortTh label="Status" k="status" sort={sort} by={by} />
+              <SortTh label="Geography" k="country" sort={sort} by={by} /><SortTh label="Owner" k="owner" sort={sort} by={by} />
+              <SortTh label="Prospects" k="prospects" sort={sort} by={by} num /><SortTh label="Open opportunities" k="open" sort={sort} by={by} num />
+              <SortTh label="Won" k="won" sort={sort} by={by} num />
+            </tr></thead>
             <tbody>
-              {filtered.map((a) => (
-                <tr key={a.id}>
+              {sorted.map((a) => (
+                <tr key={a.id} className="row-link" onClick={(e) => { if (!(e.target as HTMLElement).closest('a')) navigate(`/accounts/${a.id}`) }}>
                   <td><Link to={`/accounts/${a.id}`} style={{ fontWeight: 600 }}>{a.name}</Link><div className="sub">{a.industry}</div></td>
                   <td><span className={`pill pill-${STATUS_PILL[a.status] || 'grey'}`}>{a.status}</span></td>
                   <td className="muted">{a.country}{a.region ? ` · ${a.region}` : ''}</td>
-                  <td className="muted">{a.owner_name || '—'}</td>
+                  <td className="muted">{a.owner_name ? <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}><Avatar name={a.owner_name} size={26} />{a.owner_name}</span> : '—'}</td>
                   <td className="num">{a.prospect_count}</td>
                   <td className="num">{a.open_count}</td>
                   <td className="num">{a.won_count}</td>

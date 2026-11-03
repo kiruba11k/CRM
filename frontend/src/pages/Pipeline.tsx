@@ -6,17 +6,16 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, api } from '../api'
+import { LayoutGroup, motion } from 'framer-motion'
+import Confetti from '../components/Confetti'
 import StageMoveDialog from '../components/StageMove'
+import { Avatar, STAGE_COLOR } from '../theme'
 import { useToast } from '../components/Toast'
 import { fmtDate, money, moneyByCurrency, todayIso, totalsByCurrency } from '../format'
 import { useSession } from '../session'
 import type { FieldErrors, Opportunity, PipelineReport } from '../types'
 import { ErrorBanner, RiskPill, SelectField, useLoad } from '../ui'
 
-const STAGE_COLOR: Record<string, string> = {
-  'Lead identified': '#8A959C', Qualified: '#2E5EAA', 'Discovery / scoping': '#3E7CB1', 'Solution design': '#D99000',
-  'Proposal submitted': '#E85D3D', Negotiation: '#7A4FB5', 'Verbal commitment': '#5B3B8C', Won: '#0E7C6B', Lost: '#C93A2B',
-}
 
 interface Filters { owner: string | null; risk: string | null; service: string | null }
 
@@ -39,12 +38,14 @@ export default function Pipeline() {
   const [over, setOver] = useState<string | null>(null)
   const [landed, setLanded] = useState<string | null>(null)
   const [pending, setPending] = useState<{ opp: Opportunity; stage: string; errors: FieldErrors } | null>(null)
+  const [burst, setBurst] = useState(0)
   useEffect(() => { if (data) setRows(data) }, [data])
 
   const replace = (o: Opportunity, patch: Partial<Opportunity>) => setRows((rs) => (rs || []).map((r) => (r.id === o.id ? { ...r, ...patch } : r)))
   function settled(before: Opportunity, saved: Opportunity, undoable: boolean) {
     replace(before, { ...saved, account_name: before.account_name, owner_name: before.owner_name })
     setLanded(saved.id)
+    if (saved.stage === 'Won' && before.stage !== 'Won') setBurst((b) => b + 1)
     window.setTimeout(() => setLanded((l) => (l === saved.id ? null : l)), 700)
     void report.reload()
     toast(`Moved “${before.name}” to ${saved.stage}.`, undoable ? { action: { label: 'Undo', run: () => void move({ ...before, stage: saved.stage }, before.stage, false) } } : undefined)
@@ -101,10 +102,12 @@ export default function Pipeline() {
         <label className="check"><input type="checkbox" checked={showNurture} onChange={() => setShowNurture(!showNurture)} />Show nurtured ({nurtureCount})</label>
       </div>
       <ErrorBanner error={error} />
+      <Confetti burst={burst} />
       {pending && <StageMoveDialog opp={pending.opp} stage={pending.stage} errors={pending.errors} onCancel={() => setPending(null)}
         onDone={(saved) => { const p = pending; setPending(null); settled(p.opp, saved, true) }} />}
       {loading && !data ? <div className="loading" data-label="Loading pipeline…">Loading pipeline…</div> : (
         <div className="board-scroll">
+          <LayoutGroup>
           <div className="board">
             {lists.stages.map(({ name, probability }) => {
               const cards = visible.filter((o) => o.stage === name)
@@ -122,7 +125,8 @@ export default function Pipeline() {
                     {cards.map((o) => {
                       const overdue = !closed && !o.on_nurture && !!o.next_action_due && o.next_action_due < today
                       return (
-                        <Link key={o.id} to={`/opportunities/${o.id}`} draggable aria-roledescription="draggable deal"
+                        <motion.div key={o.id} layout layoutId={o.id} transition={{ type: 'spring', stiffness: 420, damping: 36 }}>
+                        <Link to={`/opportunities/${o.id}`} draggable aria-roledescription="draggable deal"
                           onDragStart={(e) => { e.dataTransfer.setData('text/plain', o.id); e.dataTransfer.effectAllowed = 'move'; setDragId(o.id) }}
                           onDragEnd={() => { setDragId(null); setOver(null) }}
                           className={`deal-card${o.on_nurture ? ' nurture' : o.risk_rating === 'High' ? ' risk-high' : ''}${dragId === o.id ? ' dragging' : ''}${landed === o.id ? ' landed' : ''}`}>
@@ -134,10 +138,11 @@ export default function Pipeline() {
                           </div>
                           <span className="small muted">Close {fmtDate(o.expected_close)}</span>
                           <span className="deal-foot" style={{ color: overdue ? 'var(--red-ink)' : 'var(--ink-soft)' }}>
-                            <span className="avatar" title={o.owner_name || 'Unassigned'} aria-label={`Owner: ${o.owner_name || 'Unassigned'}`}>{(o.owner_name || '?').split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}</span>
+                            <Avatar name={o.owner_name} size={24} />
                             {cardFooter(o, closed, overdue)}
                           </span>
                         </Link>
+                        </motion.div>
                       )
                     })}
                     {cards.length === 0 && over !== name && <div className="empty small" style={{ border: '1px dashed var(--line-input)', borderRadius: 10, padding: 12 }}>None</div>}
@@ -147,6 +152,7 @@ export default function Pipeline() {
               )
             })}
           </div>
+          </LayoutGroup>
         </div>
       )}
     </>
