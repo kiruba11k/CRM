@@ -34,12 +34,22 @@ async def _reset_schema():
         await con.close()
 
 
+def _roles_seed() -> str:
+    """The built-in roles exactly as migration 010 creates them."""
+    import pathlib
+    import re
+    sql = (pathlib.Path(__file__).parent.parent / "app" / "migrations" / "010_roles_people.sql").read_text()
+    return re.search(r"INSERT INTO roles.*?\);\n", sql, re.S).group(0)
+
+
 async def _truncate():
     con = await asyncpg.connect(RAW_DB)
     try:
         await con.execute(
             "TRUNCATE gmail_exclusions, quotas, digest_log, task_links, email_threads, settings_changes, launch_checklist, app_settings, list_options, calendar_sync_log, meetings, calendar_connections, booking_links, import_runs, record_history, activities, opportunity_team, opportunities, prospects, accounts, users RESTART IDENTITY CASCADE"
         )
+        if await con.fetchval("SELECT to_regclass('public.roles') IS NOT NULL"):
+            await con.execute("DELETE FROM roles; " + _roles_seed())
     finally:
         await con.close()
 

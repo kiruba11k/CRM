@@ -312,7 +312,7 @@ async def get_checklist(con: asyncpg.Connection = Depends(get_con), user: User =
 
 @router.patch("/checklist/{item_key}")
 async def update_checklist(item_key: str, body: ChecklistPatch, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
-    if not user.can_edit_all:
+    if not user.can("team_view"):
         raise HTTPException(403, "Managers and admins sign off the launch checklist.")
     if item_key not in _ITEM_KEYS:
         raise HTTPException(404, "Checklist item not found.")

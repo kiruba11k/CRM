@@ -140,7 +140,7 @@ export default function App() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
             <span>Search deals, people, pages…</span><kbd>Ctrl K</kbd>
           </button>
-          <span className="who"><Avatar name={user.name} size={32} /><span>{user.name}<span className="muted small" style={{ fontWeight: 600 }}> · {user.role}{DEV_USER ? ' (dev sign-in)' : ''}</span></span></span>
+          <span className="who"><Avatar name={user.name} size={32} /><span>{user.name}<span className="muted small" style={{ fontWeight: 600 }}> · {user.role_name || user.role}{DEV_USER ? ' (dev sign-in)' : ''}</span></span></span>
           <div className="row">
             {(['account', 'prospect'] as const).map((t) => (
               <button key={t} type="button" className="btn" onClick={() => setQuick(t)}>+ {t[0].toUpperCase() + t.slice(1)}</button>

@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
 import { fmtDateTime, nextActionLabel } from '../format'
-import { useSession } from '../session'
+import { can, useSession } from '../session'
 import { SyncPill } from '../components/Meetings'
 import type { BookingLink, CalendarStatus, CalendarSyncStatus, GmailStatus, Meeting, Opportunity, Prospect, TasksStatus } from '../types'
 import { Banner, ErrorBanner, SelectField, Tabs, TextField, useLoad } from '../ui'
@@ -142,7 +142,7 @@ function MeetingRow({ m, onChange }: { m: Meeting; onChange: () => void }) {
   const { user } = useSession()
   const [error, setError] = useState<ApiError | null>(null)
   const [busy, setBusy] = useState(false)
-  const mine = m.owner_id === user.id || user.role !== 'salesperson'
+  const mine = m.owner_id === user.id || can(user, 'edit_all')
   const act = (path: string) => {
     setBusy(true)
     api(`/meetings/${m.id}/${path}`, { method: 'POST' }).then(onChange).catch((e: ApiError) => setError(e)).finally(() => setBusy(false))
@@ -298,7 +298,7 @@ function BookingTab() {
   const [legacy, setLegacy] = useState<{ name: string; url: string }[]>(() => {
     try { return JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]') as { name: string; url: string }[] } catch { return [] }
   })
-  const can = (l: BookingLink) => l.owner_id === user.id || user.role === 'admin'
+  const canChange = (l: BookingLink) => l.owner_id === user.id || can(user, 'manage_settings')
 
   async function add(body: { name: string; url: string }) {
     await api('/booking-links', { method: 'POST', body })
@@ -337,8 +337,8 @@ function BookingTab() {
               <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}><strong>{l.name}</strong> <span className="muted small">· {l.owner_name}{l.active ? '' : ' · off'}</span><br /><a href={l.url} target="_blank" rel="noreferrer" className="small">{l.url}</a></span>
               <span className="row">
                 <button type="button" className="btn btn-outline" onClick={() => void copy(l)}>{copied === l.url ? 'Copied' : 'Copy link'}</button>
-                {can(l) && <button type="button" className="btn" onClick={() => void change(l, 'PATCH', { active: !l.active })}>{l.active ? 'Turn off' : 'Turn on'}</button>}
-                {can(l) && <button type="button" className="btn" onClick={() => void change(l, 'DELETE')}>Remove</button>}
+                {canChange(l) && <button type="button" className="btn" onClick={() => void change(l, 'PATCH', { active: !l.active })}>{l.active ? 'Turn off' : 'Turn on'}</button>}
+                {canChange(l) && <button type="button" className="btn" onClick={() => void change(l, 'DELETE')}>Remove</button>}
               </span>
             </div>
           ))}
@@ -371,7 +371,7 @@ function SyncTab() {
   return (
     <>
       <section className="card" aria-label="Calendar sync status">
-        <div className="card-head"><h2>Calendar sync status</h2><span className="muted small">{user.role === 'salesperson' ? 'Your connection' : 'Everyone on the team'}</span></div>
+        <div className="card-head"><h2>Calendar sync status</h2><span className="muted small">{can(user, 'team_view') ? 'Everyone on the team' : 'Your connection'}</span></div>
         <ErrorBanner error={error} />
         <div className="table-wrap">
           <table style={{ minWidth: 680 }}>

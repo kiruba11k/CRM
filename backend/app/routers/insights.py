@@ -35,7 +35,7 @@ def _period(period: Optional[str]) -> str:
 async def get_quotas(period: Optional[str] = None, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
     p = _period(period)
     out = await quotas.attainment(con, p)
-    out.update(previous=quotas.shift(p, -1), next=quotas.shift(p, 1), can_edit=user.can_edit_all,
+    out.update(previous=quotas.shift(p, -1), next=quotas.shift(p, 1), can_edit=user.can("set_targets"),
                this_quarter=quotas.period_of(date.today()))
     return out
 
@@ -50,8 +50,8 @@ class QuotaIn(BaseModel):
 
 @router.put("/quotas")
 async def set_quota(body: QuotaIn, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
-    if not user.can_edit_all:
-        raise HTTPException(403, "Only managers and admins set targets.")
+    if not user.can("set_targets"):
+        raise HTTPException(403, "You need the “Set sales targets” permission. Ask an admin.")
     p = _period(body.period)
     cur = body.currency.strip().upper()
     if cur not in domain.accepted("currencies"):

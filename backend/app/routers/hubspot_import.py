@@ -16,7 +16,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from .. import domain, importer
-from ..auth import User, current_user, get_con, require_admin
+from ..auth import User, current_user, get_con, require
+
+require_import = require("import_data")
 from ..config import Settings, get_settings
 from ..hubspot import HubSpot, HubSpotError
 
@@ -50,13 +52,13 @@ def _run_out(row: asyncpg.Record, with_errors: bool = False) -> dict:
 
 
 @router.get("/hubspot/status")
-async def status(con: asyncpg.Connection = Depends(get_con), settings: Settings = Depends(get_settings), user: User = Depends(require_admin)):
+async def status(con: asyncpg.Connection = Depends(get_con), settings: Settings = Depends(get_settings), user: User = Depends(require_import)):
     last = await con.fetchrow(f"SELECT {_RUN_COLS} FROM import_runs WHERE source = 'hubspot' ORDER BY started_at DESC LIMIT 1")
     return {"configured": bool(settings.hubspot_token), "last_run": _run_out(last) if last else None}
 
 
 @router.post("/hubspot/test")
-async def test_connection(request: Request, settings: Settings = Depends(get_settings), user: User = Depends(require_admin)):
+async def test_connection(request: Request, settings: Settings = Depends(get_settings), user: User = Depends(require_import)):
     try:
         async with _client(request, settings) as hs:
             info = await hs.account_info()
@@ -70,7 +72,7 @@ async def test_connection(request: Request, settings: Settings = Depends(get_set
 
 
 @router.get("/hubspot/summary")
-async def summary(request: Request, settings: Settings = Depends(get_settings), user: User = Depends(require_admin)):
+async def summary(request: Request, settings: Settings = Depends(get_settings), user: User = Depends(require_import)):
     """Record counts per object (None where a scope is missing) and the
     deal pipelines with a suggested stage mapping."""
     try:
@@ -110,7 +112,7 @@ class PreviewIn(BaseModel):
 
 @router.post("/hubspot/preview")
 async def preview(body: PreviewIn, request: Request, con: asyncpg.Connection = Depends(get_con),
-                  settings: Settings = Depends(get_settings), user: User = Depends(require_admin)):
+                  settings: Settings = Depends(get_settings), user: User = Depends(require_import)):
     """Data-quality check before import: reads HubSpot, writes nothing."""
     _check_stage_map(body.stage_map)
     try:
@@ -154,7 +156,7 @@ def _check_stage_map(stage_map: dict[str, str]) -> None:
 
 @router.post("/hubspot/runs", status_code=202)
 async def start_run(body: RunIn, request: Request, con: asyncpg.Connection = Depends(get_con),
-                    settings: Settings = Depends(get_settings), user: User = Depends(require_admin)):
+                    settings: Settings = Depends(get_settings), user: User = Depends(require_import)):
     objects = set(body.objects)
     if not objects or objects - set(importer.OBJECT_KEYS):
         raise HTTPException(422, "Choose what to import: " + ", ".join(importer.OBJECT_KEYS) + ".")
@@ -194,12 +196,12 @@ async def start_run(body: RunIn, request: Request, con: asyncpg.Connection = Dep
 
 
 @router.get("/hubspot/runs")
-async def list_runs(con: asyncpg.Connection = Depends(get_con), user: User = Depends(require_admin)):
+async def list_runs(con: asyncpg.Connection = Depends(get_con), user: User = Depends(require_import)):
     return [_run_out(r) for r in await con.fetch(f"SELECT {_RUN_COLS} FROM import_runs WHERE source = 'hubspot' ORDER BY started_at DESC LIMIT 20")]
 
 
 @router.get("/hubspot/runs/{run_id}")
-async def get_run(run_id: UUID, con: asyncpg.Connection = Depends(get_con), user: User = Depends(require_admin)):
+async def get_run(run_id: UUID, con: asyncpg.Connection = Depends(get_con), user: User = Depends(require_import)):
     row = await con.fetchrow(f"SELECT {_RUN_COLS}, errors FROM import_runs WHERE id = $1", run_id)
     if row is None:
         raise HTTPException(404, "Import run not found.")
@@ -207,7 +209,7 @@ async def get_run(run_id: UUID, con: asyncpg.Connection = Depends(get_con), user
 
 
 @router.get("/hubspot/runs/{run_id}/errors.csv")
-async def run_errors_csv(run_id: UUID, con: asyncpg.Connection = Depends(get_con), user: User = Depends(require_admin)):
+async def run_errors_csv(run_id: UUID, con: asyncpg.Connection = Depends(get_con), user: User = Depends(require_import)):
     errors = await con.fetchval("SELECT errors FROM import_runs WHERE id = $1", run_id)
     if errors is None:
         raise HTTPException(404, "Import run not found.")

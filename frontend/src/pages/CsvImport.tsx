@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
-import { useSession } from '../session'
+import { can, useSession } from '../session'
 import { Banner, CountUp, ErrorBanner, OwnerField, Segmented, SelectField, TextField, useLoad } from '../ui'
 
 type Entity = 'accounts' | 'prospects' | 'opportunities'
@@ -54,7 +54,7 @@ export function ImportTabs({ active }: { active: 'csv' | 'hubspot' }) {
 export default function CsvImport() {
   const { user, lists } = useSession()
   const [params] = useSearchParams()
-  const can = user.role !== 'salesperson'
+  const allowed = can(user, 'import_data')
   const fields = useLoad(() => api<Record<Entity, Field[]>>('/import/csv/fields'), [])
   const [step, setStep] = useState(0)
   const [entity, setEntity] = useState<Entity>(() => (['accounts', 'prospects', 'opportunities'].includes(params.get('entity') || '') ? params.get('entity') as Entity : 'accounts'))
@@ -118,8 +118,8 @@ export default function CsvImport() {
         </div>
       </div>
       <ImportTabs active="csv" />
-      {!can && <Banner kind="warn">Bulk import is for managers and admins.</Banner>}
-      {can && <>
+      {!allowed && <Banner kind="warn">Bulk import needs the “Bulk import” permission. Ask an admin.</Banner>}
+      {allowed && <>
         <nav className="steps" aria-label="Import steps">
           {STEPS.map((label, i) => (
             <button key={label} type="button" aria-current={i === step ? 'step' : undefined} className={i < step ? 'done' : undefined}

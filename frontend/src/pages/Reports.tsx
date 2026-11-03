@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
 import { fmtDate, moneyByCurrency, totalsByCurrency, todayIso } from '../format'
-import { useSession } from '../session'
+import { can, useSession } from '../session'
 import type { ActionsResponse, Opportunity, PipelineReport, Prospect } from '../types'
 import { ErrorBanner, Segmented, Tabs, useLoad } from '../ui'
 import { stageColor } from '../theme'
@@ -30,7 +30,7 @@ interface Metric { k: string; v: string; sub: string }
 
 export default function Reports() {
   const { lists, user, users } = useSession()
-  const manager = user.role !== 'salesperson'
+  const manager = can(user, 'team_view')
   const [win, setWin] = useState<Win>('90')
   const [group, setGroup] = useState<Group>('sales')
   const today = todayIso()

@@ -47,8 +47,8 @@ class PlanIn(_In):
 
 
 def _manager(user: User) -> None:
-    if not user.can_edit_all:
-        raise HTTPException(403, "Bulk import is for managers and admins.")
+    if not user.can("import_data"):
+        raise HTTPException(403, "You need the “Bulk import” permission. Ask an admin.")
 
 
 def _read(text: str):

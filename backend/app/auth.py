@@ -10,7 +10,8 @@ certificates, require a verified email from the allowed Workspace domain
 the shared pipeline; salespeople edit records they own; managers and
 admins edit everything; only admins manage users.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Optional
 
 import asyncpg
@@ -28,10 +29,16 @@ class User:
     email: str
     name: str
     role: str
+    role_name: str = ""
+    title: Optional[str] = None
+    permissions: list[str] = field(default_factory=list)
+
+    def can(self, permission: str) -> bool:
+        return permission in self.permissions
 
     @property
     def can_edit_all(self) -> bool:
-        return self.role in ("manager", "admin")
+        return self.can("edit_all")
 
 
 def _verify_google_token(token: str, settings: Settings) -> dict:
@@ -51,20 +58,29 @@ def _verify_google_token(token: str, settings: Settings) -> dict:
     return info
 
 
+_USER_SQL = ("SELECT u.id, u.email, u.name, u.role, u.active, u.title, u.last_seen_at, r.name AS role_name, r.permissions "
+             "FROM users u JOIN roles r ON r.key = u.role WHERE u.email = $1")
+
+
 async def _upsert_user(con: asyncpg.Connection, email: str, name: str, settings: Settings) -> User:
     email = email.lower()
-    row = await con.fetchrow("SELECT id, email, name, role, active FROM users WHERE email = $1", email)
+    row = await con.fetchrow(_USER_SQL, email)
     if row is None:
         role = "admin" if email in settings.admin_email_set else "salesperson"
-        row = await con.fetchrow(
-            "INSERT INTO users(email, name, role) VALUES ($1, $2, $3) "
-            "ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email RETURNING id, email, name, role, active",
+        await con.execute(
+            "INSERT INTO users(email, name, role) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING",
             email, name or email.split("@")[0], role,
         )
+        row = await con.fetchrow(_USER_SQL, email)
         logger.info(f"New CRM user {email} ({row['role']})")
     if not row["active"]:
-        raise HTTPException(403, "Your CRM access has been disabled.")
-    return User(id=str(row["id"]), email=row["email"], name=row["name"], role=row["role"])
+        raise HTTPException(403, "Your CRM access has been disabled. Ask an admin.")
+    # "Last signed in" for the People list; written at most every 10 minutes.
+    if row["last_seen_at"] is None or (datetime.now(timezone.utc) - row["last_seen_at"]).total_seconds() > 600:
+        await con.execute("UPDATE users SET last_seen_at = now(), name = CASE WHEN name = '' OR name = split_part(email, '@', 1) "
+                          "THEN COALESCE(NULLIF($2, ''), name) ELSE name END WHERE id = $1", row["id"], name)
+    return User(id=str(row["id"]), email=row["email"], name=row["name"], role=row["role"], role_name=row["role_name"],
+                title=row["title"], permissions=list(row["permissions"]))
 
 
 async def get_con(request: Request):
@@ -107,7 +123,15 @@ def ensure_can_assign(user: User, new_owner_id: Optional[str]) -> None:
     raise HTTPException(403, "Only managers and admins can assign records to someone else.")
 
 
-def require_admin(user: User = Depends(current_user)) -> User:
-    if user.role != "admin":
-        raise HTTPException(403, "Admins only.")
-    return user
+def require(permission: str):
+    """Dependency: the signed-in user must have `permission`."""
+    from .access import LABEL
+
+    def check(user: User = Depends(current_user)) -> User:
+        if not user.can(permission):
+            raise HTTPException(403, f"You need the “{LABEL[permission]}” permission for this. Ask an admin to change your role.")
+        return user
+    return check
+
+
+require_admin = require("manage_settings")

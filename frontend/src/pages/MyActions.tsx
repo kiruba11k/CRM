@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, api } from '../api'
 import { fmtDate } from '../format'
-import { useSession } from '../session'
+import { can, useSession } from '../session'
 import type { ActionItem, ActionKind, ActionsResponse, FormValues, QuotaResponse, StaleResponse } from '../types'
 import { AttainmentBar, QuietDeals, lineMoney } from '../components/Insights'
 import { Banner, CountUp, ErrorBanner, NextActionFields, Segmented, SelectField, TextField, useLoad } from '../ui'
@@ -163,7 +163,7 @@ export default function MyActions() {
   const quota = useLoad(() => api<QuotaResponse>('/quotas'), [])
   const mine = quota.data?.rows.find((r) => r.user_id === user.id)
   const quarterLines = (mine?.by_currency || []).filter((l) => l.target || Number(l.won))
-  const manager = user.role !== 'salesperson'
+  const manager = can(user, 'team_view')
   const open = (item: ActionItem, mode: Mode) => setPanel({ item, mode })
 
   return (

@@ -249,7 +249,7 @@ async def disconnect(request: Request, con: asyncpg.Connection = Depends(get_con
 @router.get("/calendar/sync-status")
 async def sync_status(con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
     """Managers and admins see everyone; salespeople see themselves."""
-    only = None if user.can_edit_all else UUID(user.id)
+    only = None if user.can("team_view") else UUID(user.id)
     users = await con.fetch(
         "SELECT u.id, u.name, u.email, c.status, c.google_email, c.last_sync_at, c.last_error, coalesce(c.tasks_enabled, false) AS tasks_enabled, "
         "(SELECT count(*) FROM task_links t WHERE t.owner_id = u.id AND t.active AND t.sync_status IN ('failed', 'not_connected')) AS tasks_unsynced, "
@@ -414,7 +414,7 @@ async def _link(con: asyncpg.Connection, link_id: UUID) -> dict:
 
 
 def _can_change_link(user: User, link: dict) -> None:
-    if not (user.role == "admin" or str(link["owner_id"]) == user.id):
+    if not (user.can("manage_settings") or str(link["owner_id"]) == user.id):
         raise HTTPException(403, "Only the link’s owner or an admin can change it.")
 
 

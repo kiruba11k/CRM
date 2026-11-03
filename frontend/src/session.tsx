@@ -1,7 +1,7 @@
 // Signed-in user + the controlled lists and user directory every screen needs.
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { ApiError, api, hasToken, setToken, setUnauthorizedHandler } from './api'
-import type { Lists, User } from './types'
+import type { Lists, Permission, User } from './types'
 
 type Status = 'loading' | 'ready' | 'signed-out'
 interface SessionState { status: Status; user: User | null; lists: Lists | null; users: User[]; error: string }
@@ -78,5 +78,10 @@ export function useSession(): ReadySession {
 
 export function useCanEdit(ownerId: string | null | undefined): boolean {
   const { user } = useSession()
-  return user.role === 'manager' || user.role === 'admin' || !ownerId || ownerId === user.id
+  return can(user, 'edit_all') || !ownerId || ownerId === user.id
+}
+
+/** Does the signed-in person's role include this permission? */
+export function can(user: User | null | undefined, permission: Permission): boolean {
+  return !!user?.permissions?.includes(permission)
 }

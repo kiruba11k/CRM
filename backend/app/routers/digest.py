@@ -54,7 +54,7 @@ async def set_me(body: PrefIn, con: asyncpg.Connection = Depends(get_con), user:
 
 async def _build_for(con: asyncpg.Connection, user: User, settings: Settings) -> dict:
     row = await con.fetchrow("SELECT id, email, name, role FROM users WHERE id = $1", UUID(user.id))
-    return await digest.build(con, dict(row), digest.local_now().date(), settings.app_url)
+    return await digest.build(con, {**dict(row), "permissions": user.permissions}, digest.local_now().date(), settings.app_url)
 
 
 @router.get("/preview")

@@ -1,10 +1,17 @@
 // Shapes returned by the CRM API (backend/app). Dates are ISO strings
 // ("2026-10-29"); money fields arrive as numbers or numeric strings.
 
-export type Role = 'salesperson' | 'manager' | 'admin'
+export type Role = string
+export type Permission = 'edit_all' | 'team_view' | 'set_targets' | 'import_data' | 'export_data' | 'manage_settings' | 'manage_users'
 export type Money = number | string | null
 
-export interface User { id: string; email: string; name: string; role: Role; active?: boolean }
+export interface User {
+  id: string; email: string; name: string; role: Role; active?: boolean
+  role_name?: string; title?: string | null; permissions?: Permission[]; last_seen_at?: string | null; created_at?: string
+}
+export interface RoleDef { key: string; name: string; description: string; permissions: Permission[]; system: boolean; position: number; members: number }
+export interface PermissionDef { key: Permission; group: string; label: string; detail: string }
+export interface RolesResponse { permissions: PermissionDef[]; roles: RoleDef[] }
 
 export interface Lists {
   next_actions: { code: string; label: string }[]

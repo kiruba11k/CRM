@@ -1,4 +1,4 @@
-"""Controlled lists, users and CSV export (§8)."""
+"""Controlled lists, the signed-in user and CSV export (§8). People and roles: routers/people.py."""
 import csv
 import io
 from typing import Literal
@@ -9,9 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from .. import domain
-from ..auth import User, current_user, get_con, require_admin
-from ..records import get_or_404
-from ..schemas import UserPatch
+from ..auth import User, current_user, get_con
 
 router = APIRouter(tags=["admin"])
 
@@ -24,25 +22,6 @@ async def lists(user: User = Depends(current_user)):
 @router.get("/me")
 async def me(user: User = Depends(current_user)):
     return user.__dict__
-
-
-@router.get("/users")
-async def users(con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
-    return [dict(r) for r in await con.fetch("SELECT id, email, name, role, active FROM users ORDER BY name")]
-
-
-@router.patch("/users/{user_id}")
-async def update_user(user_id: UUID, body: UserPatch, con: asyncpg.Connection = Depends(get_con), admin: User = Depends(require_admin)):
-    await get_or_404(con, "users", user_id, "User")
-    patch = body.model_dump(exclude_unset=True)
-    if str(user_id) == admin.id and (patch.get("role", "admin") != "admin" or patch.get("active") is False):
-        raise HTTPException(409, "You can't remove your own admin access.")
-    cols = list(patch)
-    if not cols:
-        return await get_or_404(con, "users", user_id, "User")
-    sets = ", ".join(f"{c} = ${i}" for i, c in enumerate(cols, start=2))
-    row = await con.fetchrow(f"UPDATE users SET {sets} WHERE id = $1 RETURNING id, email, name, role, active", user_id, *patch.values())
-    return dict(row)
 
 
 _EXPORTS = {
@@ -60,8 +39,8 @@ async def export_csv(
     entity: Literal["accounts", "prospects", "opportunities", "history"],
     con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user),
 ):
-    if not user.can_edit_all:
-        raise HTTPException(403, "CSV export is for managers and admins.")
+    if not user.can("export_data"):
+        raise HTTPException(403, "You need the “Export CSV” permission. Ask an admin.")
     rows = await con.fetch(_EXPORTS[entity])
     buf = io.StringIO()
     writer = csv.writer(buf)

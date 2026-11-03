@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
-import { useSession } from '../session'
+import { can, useSession } from '../session'
 import type { CleanupItem } from '../types'
 import { ErrorBanner, Tabs, useLoad } from '../ui'
 
@@ -16,7 +16,7 @@ const KIND: Record<CleanupItem['entity'], { label: string; pill: string; path: s
 
 export default function Cleanup() {
   const { user } = useSession()
-  const [scope, setScope] = useState<Scope>(user.role === 'salesperson' ? 'mine' : 'all')
+  const [scope, setScope] = useState<Scope>(can(user, 'team_view') ? 'all' : 'mine')
   const { data, error, loading } = useLoad(() => api<CleanupItem[]>('/import/cleanup', { params: { scope } }), [scope])
   const rows = data || []
   return (

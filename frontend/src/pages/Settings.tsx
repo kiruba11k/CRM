@@ -4,8 +4,9 @@
 import { useEffect, useState } from 'react'
 import { ApiError, api, downloadCsv } from '../api'
 import { fmtDateTime } from '../format'
-import { useSession } from '../session'
-import type { CalendarStatus, ChecklistItem, DigestMe, DigestPreview, EditableList, ReminderSettings, Role, SettingsChange, SettingsView, User } from '../types'
+import { can, useSession } from '../session'
+import PeopleAccess from '../components/PeopleAccess'
+import type { CalendarStatus, ChecklistItem, DigestMe, DigestPreview, EditableList, ReminderSettings, SettingsChange, SettingsView } from '../types'
 import { Banner, ErrorBanner, Tabs, TextField, useLoad } from '../ui'
 
 type Tab = 'lists' | 'reminders' | 'roles' | 'integrations' | 'data' | 'launch' | 'log'
@@ -177,7 +178,7 @@ function EditableListPanel({ listKey, view, onView, admin }: { listKey: Editable
 
 function ListsTab({ view, onView }: { view: SettingsView; onView: (v: SettingsView) => void }) {
   const { user } = useSession()
-  const admin = user.role === 'admin'
+  const admin = can(user, 'manage_settings')
   const [panel, setPanel] = useState<Panel>({ kind: 'list', key: 'nurture_reasons' })
   const fixedNames: [string, string][] = [['next_actions', 'Next actions'], ['prospect_statuses', 'Prospect statuses'], ['risk_ratings', 'Risk ratings']]
   const isSel = (p: Panel) => JSON.stringify(p) === JSON.stringify(panel)
@@ -259,7 +260,7 @@ function DigestCard({ reminders }: { reminders: ReminderSettings }) {
         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
           <button type="button" className="btn btn-outline" disabled={!!busy} onClick={() => void call('preview', () => api<DigestPreview>('/digest/preview')).then((p) => p && setPreview(p))}>{busy === 'preview' ? 'Building…' : 'Preview today’s digest'}</button>
           <button type="button" className="btn" disabled={!!busy || !d.configured} onClick={() => void call('test', () => api<{ sent_to: string }>('/digest/test', { method: 'POST', body: {} })).then((r) => r && setMsg(`Test digest sent to ${r.sent_to}.`))}>{busy === 'test' ? 'Sending…' : 'Email me a test'}</button>
-          {user.role === 'admin' && <button type="button" className="btn" disabled={!!busy || !d.configured}
+          {can(user, 'manage_settings') && <button type="button" className="btn" disabled={!!busy || !d.configured}
             onClick={() => void call('run', () => api<{ sent: number; skipped: number; failed: number; already: number }>('/digest/run', { method: 'POST', body: {} }))
               .then((r) => { if (r) { setMsg(`Digests: ${r.sent} sent, ${r.skipped} with nothing due, ${r.already} already sent today${r.failed ? `, ${r.failed} failed` : ''}.`); void me.reload() } })}>
             {busy === 'run' ? 'Sending…' : 'Send today’s digests now'}</button>}
@@ -278,7 +279,7 @@ function DigestCard({ reminders }: { reminders: ReminderSettings }) {
 
 function RemindersTab({ view, onView }: { view: SettingsView; onView: (v: SettingsView) => void }) {
   const { user } = useSession()
-  const admin = user.role === 'admin'
+  const admin = can(user, 'manage_settings')
   const act = useSettingsAction(onView)
   // Show the change at once; fall back to the saved values if it fails.
   const [r, setR] = useState<ReminderSettings>(view.reminders)
@@ -349,87 +350,6 @@ function RemindersTab({ view, onView }: { view: SettingsView; onView: (v: Settin
       {!admin && <span className="muted small">Only admins change reminder settings.</span>}
     </section>
     <DigestCard reminders={r} />
-    </>
-  )
-}
-
-const PERMS: [string, boolean, boolean, boolean][] = [
-  ['See all accounts, prospects and opportunities (shared pipeline)', true, true, true],
-  ['Edit records assigned to them', true, true, true],
-  ['Edit anyone’s records / reassign owners', false, true, true],
-  ['Be added to proposal & database-build teams', true, true, true],
-  ['Manage stages, lists and reminder defaults', false, false, true],
-  ['Export CSV', false, true, true],
-  ['Manage users and roles', false, false, true],
-]
-const ROLE_LABEL: Record<Role, string> = { salesperson: 'Salesperson', manager: 'Manager', admin: 'Admin' }
-
-function RolesTab() {
-  const { user, lists, refreshUsers } = useSession()
-  const admin = user.role === 'admin'
-  const { data, error, reload } = useLoad(() => api<User[]>('/users'), [])
-  const [saveError, setSaveError] = useState<ApiError | null>(null)
-  const [msg, setMsg] = useState('')
-
-  async function patch(u: User, body: Partial<Pick<User, 'role' | 'active'>>) {
-    setSaveError(null)
-    setMsg('')
-    try {
-      await api(`/users/${u.id}`, { method: 'PATCH', body })
-      setMsg(`${u.name} updated.`)
-      await Promise.all([reload(), refreshUsers()])
-    } catch (e) { setSaveError(e as ApiError) }
-  }
-
-  const tick = (on: boolean) => <span style={{ color: on ? 'var(--teal-ink)' : '#8A959C', fontWeight: 700 }}>{on ? '✓ Yes' : '— No'}</span>
-  return (
-    <>
-      <section className="card" aria-label="Access model">
-        <div className="card-head"><h2>Access model</h2><span className="pill pill-amber">Confirm before production (§8.1)</span></div>
-        <div className="table-wrap">
-          <table style={{ minWidth: 620 }}>
-            <thead><tr><th>Permission</th><th>Salesperson</th><th>Manager</th><th>Admin</th></tr></thead>
-            <tbody>{PERMS.map(([name, s, m, a]) => <tr key={name}><td>{name}</td><td>{tick(s)}</td><td>{tick(m)}</td><td>{tick(a)}</td></tr>)}</tbody>
-          </table>
-        </div>
-      </section>
-      <section className="card" aria-label="Users">
-        <div className="card-head"><h2>Users</h2><span className="muted small">People join by signing in with their leadstrategus.com Google account. Admin emails are set on the server.</span></div>
-        <ErrorBanner error={error || saveError} onClose={() => setSaveError(null)} />
-        {msg && <Banner onClose={() => setMsg('')}>{msg}</Banner>}
-        {!admin && <Banner kind="warn">Only admins can change roles or deactivate users.</Banner>}
-        <div className="table-wrap">
-          <table style={{ minWidth: 620 }}>
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead>
-            <tbody>
-              {(data || []).map((u) => {
-                const self = u.id === user.id
-                return (
-                  <tr key={u.id}>
-                    <td style={{ fontWeight: 600 }}>{u.name}{self && <span className="muted small"> (you)</span>}</td>
-                    <td className="muted">{u.email}</td>
-                    <td>
-                      {admin && !self ? (
-                        <select className="input" aria-label={`Role for ${u.name}`} value={u.role} onChange={(e) => void patch(u, { role: e.target.value as Role })}>
-                          {lists.roles.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}
-                        </select>
-                      ) : ROLE_LABEL[u.role]}
-                    </td>
-                    <td>
-                      {admin && !self ? (
-                        <button type="button" className="btn" onClick={() => void patch(u, { active: u.active === false })}>
-                          {u.active === false ? 'Reactivate' : 'Deactivate'}
-                        </button>
-                      ) : <span className={`pill pill-${u.active === false ? 'grey' : 'teal'}`}>{u.active === false ? 'Inactive' : 'Active'}</span>}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-        <span className="muted small">You can’t change your own role or deactivate yourself, so there is always an admin.</span>
-      </section>
     </>
   )
 }
@@ -513,19 +433,19 @@ function DataTab() {
   const { user } = useSession()
   const [error, setError] = useState<ApiError | null>(null)
   const [done, setDone] = useState('')
-  const can = user.role !== 'salesperson'
+  const allowed = can(user, 'export_data')
   return (
     <>
-    {user.role === 'admin' && <DemoCard />}
+    {can(user, 'manage_settings') && <DemoCard />}
     <div className="cols">
       <section className="card col-main" aria-label="CSV export">
         <h2>CSV export</h2>
         <ErrorBanner error={error} onClose={() => setError(null)} />
         {done && <Banner onClose={() => setDone('')}>{done} downloaded.</Banner>}
-        {!can && <Banner kind="warn">CSV export is for managers and admins.</Banner>}
+        {!allowed && <Banner kind="warn">CSV export needs the “Export CSV” permission.</Banner>}
         <div className="row">
           {EXPORTS.map(([entity, label]) => (
-            <button key={entity} type="button" className="btn" disabled={!can}
+            <button key={entity} type="button" className="btn" disabled={!allowed}
               onClick={() => downloadCsv(entity).then(() => setDone(label)).catch((e: ApiError) => setError(e))}>Export {label}</button>
           ))}
         </div>
@@ -545,7 +465,7 @@ function DataTab() {
 
 function LaunchTab() {
   const { user } = useSession()
-  const can = user.role !== 'salesperson'
+  const allowed = can(user, 'team_view')
   const { data, error, reload } = useLoad(() => api<ChecklistItem[]>('/settings/checklist'), [])
   const [saveError, setSaveError] = useState<ApiError | null>(null)
   const [notes, setNotes] = useState<Record<string, string>>({})
@@ -566,13 +486,13 @@ function LaunchTab() {
           {items.map((i) => (
             <div className="list-row" key={i.key} style={{ alignItems: 'flex-start' }}>
               <label className="check" style={{ flex: '1 1 280px', alignItems: 'flex-start' }}>
-                <input type="checkbox" checked={i.done} disabled={!can} onChange={(e) => void patch(i.key, { done: e.target.checked })} />
+                <input type="checkbox" checked={i.done} disabled={!allowed} onChange={(e) => void patch(i.key, { done: e.target.checked })} />
                 <span><strong>{i.name}</strong><br /><span className="muted small">{i.detail}</span>
                   {i.updated_by && <><br /><span className="muted small">{i.done ? 'Ticked' : 'Updated'} by {i.updated_by} · {fmtDateTime(i.updated_at)}</span></>}
                   {i.note && <><br /><span className="small">Note: {i.note}</span></>}
                 </span>
               </label>
-              {can && (
+              {allowed && (
                 <span className="row" style={{ gap: 6 }}>
                   <input className="input" style={{ width: 180 }} aria-label={`Note for ${i.name}`} placeholder="Add a note" value={notes[i.key] ?? ''}
                     onChange={(e) => setNotes({ ...notes, [i.key]: e.target.value })} />
@@ -589,7 +509,7 @@ function LaunchTab() {
   return (
     <>
       <ErrorBanner error={error || saveError} onClose={() => setSaveError(null)} />
-      {!can && <Banner kind="warn">Managers and admins sign off the launch checklist; everyone can see it.</Banner>}
+      {!allowed && <Banner kind="warn">Managers and admins sign off the launch checklist; everyone can see it.</Banner>}
       <div className="cols">
         <div className="col-main">{group('Decisions to confirm (§10)', 'decision', 'confirmed')}</div>
         <div className="col-main">{group('Pilot acceptance tests (§9)', 'test', 'passed')}</div>
@@ -632,7 +552,7 @@ export default function Settings() {
         </div>
       </div>
       <Tabs<Tab> label="Settings sections" value={tab} onChange={setTab} tabs={[
-        { value: 'lists', label: 'Controlled lists' }, { value: 'reminders', label: 'Reminders' }, { value: 'roles', label: 'Users & roles' },
+        { value: 'lists', label: 'Controlled lists' }, { value: 'reminders', label: 'Reminders' }, { value: 'roles', label: 'People & access' },
         { value: 'integrations', label: 'Google integrations' }, { value: 'data', label: 'Export & backup' }, { value: 'launch', label: 'Launch checklist' },
         { value: 'log', label: 'Change log' },
       ]} />
@@ -640,7 +560,7 @@ export default function Settings() {
       {needsView && !current && !settings.error && <div className="loading" data-label="Loading settings…">Loading settings…</div>}
       {tab === 'lists' && current && <ListsTab view={current} onView={setView} />}
       {tab === 'reminders' && current && <RemindersTab view={current} onView={setView} />}
-      {tab === 'roles' && <RolesTab />}
+      {tab === 'roles' && <PeopleAccess />}
       {tab === 'integrations' && <IntegrationsTab />}
       {tab === 'data' && <DataTab />}
       {tab === 'launch' && <LaunchTab />}

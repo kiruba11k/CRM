@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { ApiError, api } from '../api'
 import { fmtDate, fmtDateTime, nextActionLabel, userName } from '../format'
-import { useSession } from '../session'
+import { can, useSession } from '../session'
 import type { Activity, HistoryEntry, Lists, User } from '../types'
 import { ErrorBanner, SelectField, TextField } from '../ui'
 
@@ -59,7 +59,7 @@ function AutoEmail({ a, onRemoved }: { a: Activity; onRemoved?: () => void }) {
   const { user } = useSession()
   const [busy, setBusy] = useState(false)
   const mine = a.created_by_id === user.id
-  const canRemove = mine || user.role !== 'salesperson'
+  const canRemove = mine || can(user, 'edit_all')
   const remove = async () => {
     if (!window.confirm('Remove this email from the CRM? It’s taken off every record and won’t be logged again. Nothing changes in Gmail.')) return
     setBusy(true)

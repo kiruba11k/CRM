@@ -46,7 +46,8 @@ async def attainment(con: asyncpg.Connection, period: str, today: Optional[date]
     start, end = bounds(period)
     current = start <= today <= end
     users = await con.fetch(
-        "SELECT id, name, email, role, active FROM users WHERE ($1::uuid IS NULL OR id = $1) ORDER BY name", user_id)
+        "SELECT u.id, u.name, u.email, u.role, u.active, r.permissions FROM users u JOIN roles r ON r.key = u.role "
+        "WHERE ($1::uuid IS NULL OR u.id = $1) ORDER BY u.name", user_id)
     targets = await con.fetch("SELECT user_id, currency, amount FROM quotas WHERE period = $1", period)
     won = await con.fetch(
         "SELECT owner_id, currency, COALESCE(actual_value, estimated_value) AS v FROM opportunities "
@@ -59,6 +60,7 @@ async def attainment(con: asyncpg.Connection, period: str, today: Optional[date]
     rows: dict[UUID, dict] = {}
     for u in users:
         rows[u["id"]] = {"user_id": u["id"], "name": u["name"] or u["email"], "role": u["role"], "active": u["active"],
+                         "lead": "team_view" in u["permissions"],
                          "target": {}, "won": {}, "won_count": 0, "pipeline": {}, "weighted": {}, "pipeline_count": 0}
     for t in targets:
         if t["user_id"] in rows:
@@ -80,8 +82,9 @@ async def attainment(con: asyncpg.Connection, period: str, today: Optional[date]
         has_any = r["target"] or r["won"] or r["pipeline"]
         if not r["active"] and not has_any:
             continue
-        if user_id is None and r["role"] != "salesperson" and not has_any:
+        if user_id is None and r.pop("lead") and not has_any:
             continue  # managers/admins without deals or targets add noise
+        r.pop("lead", None)
         r["by_currency"] = _by_currency(r)
         for k in team:
             for cur, v in r[k].items():

@@ -180,7 +180,8 @@ class NoteIn(_In):
 
 class UserPatch(_In):
     name: Optional[str] = None
-    role: Optional[Literal["salesperson", "manager", "admin"]] = None
+    title: Optional[str] = None
+    role: Optional[str] = None
     active: Optional[bool] = None
 
 

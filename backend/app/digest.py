@@ -48,7 +48,7 @@ async def build(con: asyncpg.Connection, user: dict, today: date, app_url: str) 
     mine = await collect(con, uid, today)
     quiet = await alerts.stale_deals(con, uid, today)
     q = await quotas.attainment(con, quotas.period_of(today), today, uid)
-    manager = user["role"] in ("manager", "admin")
+    manager = "team_view" in (user.get("permissions") or [])
     team = await collect(con, None, today) if manager else None
     team_quiet = await alerts.stale_deals(con, None, today) if manager else []
 
@@ -175,7 +175,8 @@ async def run(con: asyncpg.Connection, mailer: Mailer, app_url: str, now: Option
             return {**base, "status": "too_early"}
     if not mailer.configured:
         return {**base, "status": "not_configured"}
-    users = await con.fetch("SELECT id, email, name, role FROM users WHERE active AND digest_enabled ORDER BY email")
+    users = await con.fetch("SELECT u.id, u.email, u.name, u.role, r.permissions FROM users u JOIN roles r ON r.key = u.role "
+                            "WHERE u.active AND u.digest_enabled ORDER BY u.email")
     for u in users:
         if not await _claim(con, u["id"], day):
             base["already"] += 1

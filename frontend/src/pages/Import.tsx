@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, api, downloadFile } from '../api'
 import { fmtDateTime } from '../format'
-import { useSession } from '../session'
+import { can, useSession } from '../session'
 import type { HubSpotSummary, HubSpotTest, ImportObject, ImportRun, ImportStatus, QualityIssue } from '../types'
 import { Banner, ErrorBanner, SelectField, useLoad } from '../ui'
 import { ImportTabs } from './CsvImport'
@@ -90,7 +90,7 @@ function RunView({ run }: { run: ImportRun }) {
 
 export default function Import() {
   const { user } = useSession()
-  const admin = user.role === 'admin'
+  const admin = can(user, 'import_data')
   const status = useLoad(() => (admin ? api<ImportStatus>('/import/hubspot/status') : Promise.resolve(null)), [admin])
   const [step, setStep] = useState(0)
   const [error, setError] = useState<ApiError | null>(null)

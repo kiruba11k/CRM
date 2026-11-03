@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import { ApiError, api } from '../api'
 import { fmtDate } from '../format'
-import { useSession } from '../session'
+import { can, useSession } from '../session'
 import type { EmailThread } from '../types'
 import { ErrorBanner, TextField, useLoad } from '../ui'
 
@@ -61,7 +61,7 @@ export function GmailCard({ entityType, entityId, emails, domain, subject, canEd
         <div key={t.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <a href={t.url} target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>{t.label}</a>
           <span className="small muted">Linked by {t.linked_by_name || '—'} · {fmtDate(t.linked_at)}
-            {(t.linked_by === user.id || user.role !== 'salesperson') && <> · <button type="button" className="btn-link small" onClick={() => void unlink(t)}>Remove</button></>}
+            {(t.linked_by === user.id || can(user, 'edit_all')) && <> · <button type="button" className="btn-link small" onClick={() => void unlink(t)}>Remove</button></>}
           </span>
         </div>
       ))}
