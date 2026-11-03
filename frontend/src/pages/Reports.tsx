@@ -9,6 +9,7 @@ import type { ActionsResponse, Opportunity, PipelineReport, Prospect } from '../
 import { ErrorBanner, Segmented, Tabs, useLoad } from '../ui'
 import { stageColor } from '../theme'
 import Targets from '../components/Targets'
+import PipelineInsights from '../components/PipelineInsights'
 
 type Win = '90' | 'quarter' | 'ytd'
 type Group = 'sales' | 'geo' | 'service'
@@ -145,6 +146,8 @@ export default function Reports() {
             <span className="muted small">Bar length = number of deals. Values are unweighted, per currency; nurtured deals are excluded.</span>
           </section>
         </div>
+
+        <PipelineInsights />
 
         <section className="card" aria-label="Breakdown">
           <Tabs<Group> label="Breakdown" value={group} onChange={setGroup}

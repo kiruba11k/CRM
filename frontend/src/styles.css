@@ -631,3 +631,33 @@ main.main:has(.bulk-bar) { padding-bottom: 140px; }
 .dup-val.on { background: var(--accent-soft); border-color: var(--accent); }
 .dup-val span { white-space: pre-wrap; word-break: break-word; }
 @media (max-width: 640px) { .dup-cards { grid-template-columns: minmax(0, 1fr); } .dup-vs { justify-self: center; transform: rotate(90deg); } }
+
+/* Charts (validated pair: light #4F46E5/#0D9488, dark #7479EC/#169F8F) */
+:root { --series-1: #4F46E5; --series-2: #0D9488; }
+:root[data-theme="dark"] { --series-1: #7479EC; --series-2: #169F8F; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --series-1: #7479EC; --series-2: #169F8F; } }
+.trend-wrap { position: relative; width: 100%; }
+.trend-wrap svg { display: block; touch-action: pan-y; }
+.chart-grid { stroke: var(--line-soft); stroke-width: 1; }
+.chart-axis { fill: var(--ink-soft); font-size: 11px; }
+.chart-label { fill: var(--ink); font-size: 12px; font-weight: 600; }
+.chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-line.s1 { stroke: var(--series-1); }
+.chart-line.s2 { stroke: var(--series-2); }
+.chart-dot { stroke: var(--surface); stroke-width: 2; }
+.chart-dot.s1 { fill: var(--series-1); }
+.chart-dot.s2 { fill: var(--series-2); }
+.chart-dot.rebuilt { fill: var(--surface); stroke-width: 2; }
+.chart-dot.rebuilt.s1 { stroke: var(--series-1); }
+.chart-dot.rebuilt.s2 { stroke: var(--series-2); }
+.chart-cross { stroke: var(--ink-soft); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-tip { position: absolute; z-index: 5; width: 200px; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(15, 17, 35, .16); padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--ink-soft); }
+.chart-legend span, .chart-tip span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 12px; height: 3px; border-radius: 2px; }
+.sw.s1 { background: var(--series-1); }
+.sw.s2 { background: var(--series-2); }
+.sw.hollow { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--ink-soft); }
+.wr { display: flex; align-items: center; gap: 8px; min-width: 140px; }
+.wr .bar-track { flex: 1; }

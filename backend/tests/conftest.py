@@ -46,7 +46,7 @@ async def _truncate():
     con = await asyncpg.connect(RAW_DB)
     try:
         await con.execute(
-            "TRUNCATE merge_log, duplicate_dismissals, saved_view_defaults, saved_views, gmail_exclusions, quotas, digest_log, task_links, email_threads, settings_changes, launch_checklist, app_settings, list_options, calendar_sync_log, meetings, calendar_connections, booking_links, import_runs, record_history, activities, opportunity_team, opportunities, prospects, accounts, users RESTART IDENTITY CASCADE"
+            "TRUNCATE pipeline_snapshots, merge_log, duplicate_dismissals, saved_view_defaults, saved_views, gmail_exclusions, quotas, digest_log, task_links, email_threads, settings_changes, launch_checklist, app_settings, list_options, calendar_sync_log, meetings, calendar_connections, booking_links, import_runs, record_history, activities, opportunity_team, opportunities, prospects, accounts, users RESTART IDENTITY CASCADE"
         )
         if await con.fetchval("SELECT to_regclass('public.roles') IS NOT NULL"):
             await con.execute("DELETE FROM roles; " + _roles_seed())

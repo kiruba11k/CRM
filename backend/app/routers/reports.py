@@ -56,3 +56,18 @@ async def forecast(con: asyncpg.Connection = Depends(get_con), user: User = Depe
         {"period": p, "count": len(rs), "unweighted": _by_currency(rs, False), "weighted": _by_currency(rs, True)}
         for p, rs in sorted(periods.items())
     ]
+
+
+@router.get("/insights")
+async def pipeline_insights(weeks: int = 12, months: int = 12, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+    """Pipeline trend (weekly), stage speed and win/loss for the Reports page."""
+    from .. import insights
+
+    weeks, months = max(4, min(weeks, 52)), max(1, min(months, 36))
+    await insights.take_snapshot(con)   # today's point, if the hourly job hasn't yet
+    return {
+        "trend": await insights.trend(con, weeks),
+        "stage_speed": await insights.stage_speed(con, months),
+        "win_loss": await insights.win_loss(con, months),
+        "months": months,
+    }

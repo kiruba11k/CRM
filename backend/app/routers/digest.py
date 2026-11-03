@@ -89,6 +89,8 @@ async def cron(request: Request, con: asyncpg.Connection = Depends(get_con), set
     if not settings.cron_secret or not x_cron_secret or not hmac.compare_digest(x_cron_secret, settings.cron_secret):
         raise HTTPException(403, "Bad or missing X-Cron-Secret.")
     await listconfig.ensure_fresh(con, 0)
+    from .. import insights
+    await insights.take_snapshot(con)   # daily pipeline snapshot for the trend on Reports
     # Gmail auto-logging rides on the same hourly call, before the digest so
     # today's emails count as activity.
     gmail = None
