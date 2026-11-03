@@ -34,6 +34,9 @@ SCOPES = ["openid", "email", "https://www.googleapis.com/auth/calendar.events"]
 # narrower scope that can write tasks.
 TASKS_SCOPE = "https://www.googleapis.com/auth/tasks"
 TASKS_API = "https://tasks.googleapis.com/tasks/v1"
+# Gmail auto-logging: headers only (From/To/Cc/Subject/Date), never bodies.
+GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.metadata"
+GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me"
 STATE_TTL = 600
 
 
@@ -66,8 +69,8 @@ def decrypt(secret: str, value: str) -> str:
         raise CalendarError("Stored Google credentials can’t be read (CRM_TOKEN_KEY changed?). Reconnect Google Calendar.", reconnect=True) from e
 
 
-def make_state(secret: str, user_id: str, now: Optional[float] = None, tasks: bool = False) -> str:
-    data = {"u": user_id, "t": int(now or time.time()), **({"k": 1} if tasks else {})}
+def make_state(secret: str, user_id: str, now: Optional[float] = None, tasks: bool = False, gmail: bool = False) -> str:
+    data = {"u": user_id, "t": int(now or time.time()), **({"k": 1} if tasks else {}), **({"g": 1} if gmail else {})}
     payload = base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip("=")
     sig = hmac.new(_key(secret, b"oauth-state"), payload.encode(), hashlib.sha256).hexdigest()[:32]
     return f"{payload}.{sig}"
@@ -93,10 +96,10 @@ def read_state_data(secret: str, state: str, now: Optional[float] = None) -> dic
     return data
 
 
-def auth_url(client_id: str, redirect_uri: str, state: str, login_hint: str, domain: str, tasks: bool = False) -> str:
+def auth_url(client_id: str, redirect_uri: str, state: str, login_hint: str, domain: str, tasks: bool = False, gmail: bool = False) -> str:
     return AUTH_URL + "?" + urlencode({
         "client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code",
-        "scope": " ".join(SCOPES + ([TASKS_SCOPE] if tasks else [])),
+        "scope": " ".join(SCOPES + ([TASKS_SCOPE] if tasks else []) + ([GMAIL_SCOPE] if gmail else [])),
         "access_type": "offline", "prompt": "consent", "include_granted_scopes": "true",
         "state": state, "login_hint": login_hint, "hd": domain,
     })
@@ -173,10 +176,10 @@ class Google:
         try:
             resp = await self._c.request(method, url, headers={"Authorization": f"Bearer {token}"}, **kw)
         except httpx.TransportError as e:
-            raise CalendarError(f"Couldn’t reach Google Calendar: {e}", 503) from e
+            raise CalendarError(f"Couldn’t reach Google: {e}", 503) from e
         if resp.status_code == 401:
             self._access.pop(refresh_token, None)
-            raise CalendarError("Google Calendar rejected the saved access: reconnect Google Calendar.", 401, reconnect=True)
+            raise CalendarError("Google rejected the saved access: reconnect Google on the Meetings page.", 401, reconnect=True)
         if resp.status_code >= 400:
             raise CalendarError(f"Google Calendar returned {resp.status_code}: {_google_message(resp)}", resp.status_code)
         return resp.json() if resp.content else None
@@ -234,6 +237,32 @@ class Google:
             if not data.get("nextPageToken"):
                 return None
             params["pageToken"] = data["nextPageToken"]
+
+
+    # ── Gmail (metadata only) ─────────────────────────────────────────
+    async def gmail_profile(self, refresh_token: str) -> dict:
+        return await self._call(refresh_token, "GET", f"{GMAIL_API}/profile")
+
+    async def gmail_list(self, refresh_token: str, page_token: Optional[str] = None) -> dict:
+        params: dict = {"maxResults": 100}
+        if page_token:
+            params["pageToken"] = page_token
+        return await self._call(refresh_token, "GET", f"{GMAIL_API}/messages", params=params) or {}
+
+    async def gmail_history(self, refresh_token: str, start: str, page_token: Optional[str] = None) -> dict:
+        params: dict = {"startHistoryId": start, "historyTypes": "messageAdded", "maxResults": 500}
+        if page_token:
+            params["pageToken"] = page_token
+        return await self._call(refresh_token, "GET", f"{GMAIL_API}/history", params=params) or {}
+
+    async def gmail_message(self, refresh_token: str, message_id: str) -> Optional[dict]:
+        try:
+            return await self._call(refresh_token, "GET", f"{GMAIL_API}/messages/{quote(message_id, safe='')}", params=[
+                ("format", "metadata"), *[("metadataHeaders", h) for h in ("From", "To", "Cc", "Subject")]])
+        except CalendarError as e:
+            if e.status == 404:  # deleted since it was listed
+                return None
+            raise
 
 
 def event_id_for(meeting_id: str) -> str:

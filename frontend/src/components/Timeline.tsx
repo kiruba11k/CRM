@@ -42,12 +42,37 @@ export function ActivityCard({ activities, postUrl, onAdded }: { activities: Act
         {(activities || []).map((a) => (
           <div className="timeline-item" key={a.id}>
             <span className="muted small">{fmtDateTime(a.occurred_at)}</span>
-            <span><strong>{a.summary}</strong> <span className="muted">· {a.kind.replace('_', ' ')}{a.created_by ? ` · ${a.created_by}` : ''}</span></span>
+            {a.email_direction ? <AutoEmail a={a} onRemoved={onAdded} /> : (
+              <span><strong>{a.summary}</strong> <span className="muted">· {a.kind.replace('_', ' ')}{a.created_by ? ` · ${a.created_by}` : ''}</span></span>
+            )}
           </div>
         ))}
         {(!activities || activities.length === 0) && <p className="muted small">No activity yet.</p>}
       </div>
     </section>
+  )
+}
+
+// An email logged automatically from someone's Gmail (headers only). Only
+// the person whose mailbox it came from can open it in Gmail.
+function AutoEmail({ a, onRemoved }: { a: Activity; onRemoved?: () => void }) {
+  const { user } = useSession()
+  const [busy, setBusy] = useState(false)
+  const mine = a.created_by_id === user.id
+  const canRemove = mine || user.role !== 'salesperson'
+  const remove = async () => {
+    if (!window.confirm('Remove this email from the CRM? It’s taken off every record and won’t be logged again. Nothing changes in Gmail.')) return
+    setBusy(true)
+    try { await api(`/gmail/logged/${a.id}`, { method: 'DELETE' }); onRemoved?.() } catch (e) { window.alert((e as ApiError).message) } finally { setBusy(false) }
+  }
+  return (
+    <span>
+      <span className={`pill pill-${a.email_direction === 'out' ? 'blue' : 'teal'}`} style={{ marginRight: 6 }}>{a.email_direction === 'out' ? '↗ Sent' : '↙ Received'}</span>
+      <strong>{a.summary}</strong>{' '}
+      <span className="muted">· auto-logged from {mine ? 'your' : `${a.created_by || 'a colleague'}’s`} Gmail</span>
+      {mine && a.gmail_thread_id && <> · <a href={`https://mail.google.com/mail/?authuser=${encodeURIComponent(a.created_by_email || '')}#all/${encodeURIComponent(a.gmail_thread_id)}`} target="_blank" rel="noreferrer">Open in Gmail</a></>}
+      {canRemove && <> · <button type="button" className="link-btn" disabled={busy} onClick={() => void remove()}>Remove</button></>}
+    </span>
   )
 }
 

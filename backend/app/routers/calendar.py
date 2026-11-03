@@ -15,7 +15,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from .. import domain, google_calendar as gc, tasksync
+from .. import domain, gmailsync, google_calendar as gc, tasksync
 from ..auth import User, current_user, get_con
 from ..config import Settings, get_settings
 from ..records import log_activity, raise_if_errors
@@ -211,6 +211,13 @@ async def oauth_callback(request: Request, state: str = "", code: str = "", erro
         user["id"], email, gc.encrypt(settings.token_key, tokens["refresh_token"]), tokens.get("scope", ""))
     await _log(con, None, user["id"], "connect", True, f"Connected Google Calendar for {email}.")
     tasks_note = ""
+    if state_data.get("g"):
+        if gc.GMAIL_SCOPE in tokens.get("scope", ""):
+            await con.execute("UPDATE calendar_connections SET gmail_enabled = true, gmail_error = NULL WHERE user_id = $1", user["id"])
+            gmailsync.start_sync(request, google, settings, user["id"])
+            tasks_note = "Gmail auto-logging is on: emails with your prospects from the last 30 days are being logged now."
+        else:
+            tasks_note = "Gmail access wasn’t granted, so auto-logging stays off."
     if state_data.get("k"):
         if gc.TASKS_SCOPE in tokens.get("scope", ""):
             await con.execute("UPDATE calendar_connections SET tasks_enabled = true WHERE user_id = $1", user["id"])

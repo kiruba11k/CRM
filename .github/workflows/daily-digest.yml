@@ -1,4 +1,5 @@
-# Daily digest email trigger. Runs every hour; the API sends each person's
+# Hourly CRM jobs: Gmail auto-logging for everyone who turned it on, then the
+# daily digest email. The API sends each person's
 # digest once per day, after the hour set in Settings → Reminders (in the
 # time zone set there), so most runs do nothing. Each call also wakes the
 # free Render API if it is asleep.

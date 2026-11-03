@@ -9,7 +9,7 @@ import { ApiError, api } from '../api'
 import { fmtDateTime, nextActionLabel } from '../format'
 import { useSession } from '../session'
 import { SyncPill } from '../components/Meetings'
-import type { BookingLink, CalendarStatus, CalendarSyncStatus, Meeting, Opportunity, Prospect, TasksStatus } from '../types'
+import type { BookingLink, CalendarStatus, CalendarSyncStatus, GmailStatus, Meeting, Opportunity, Prospect, TasksStatus } from '../types'
 import { Banner, ErrorBanner, SelectField, Tabs, TextField, useLoad } from '../ui'
 
 type Tab = 'schedule' | 'booking' | 'sync'
@@ -64,6 +64,50 @@ function TasksBar() {
         {s.enabled
           ? <button type="button" className="btn" disabled={busy} onClick={() => { if (window.confirm('Turn off Google Tasks? This removes the “LeadStrategus CRM” list from your Google Tasks.')) run('/tasks/disable') }}>Turn off</button>
           : <button type="button" className="btn btn-dark" disabled={busy} onClick={() => run('/tasks/enable')}>Turn on Google Tasks</button>}
+      </div>
+    </>
+  )
+}
+
+// Gmail auto-logging: each person opts in. Headers only (who, subject, when);
+// email bodies are never read.
+function GmailBar() {
+  const status = useLoad(() => api<GmailStatus>('/gmail/status'), [])
+  const [error, setError] = useState<ApiError | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
+  const s = status.data
+  const reload = status.reload
+  useEffect(() => {
+    // The first sync runs in the background: check back until it's done.
+    if (!s?.enabled || s.first_sync_done || s.error) return
+    const t = window.setTimeout(() => void reload(), 3000)
+    return () => window.clearTimeout(t)
+  }, [s, reload])
+  if (!s || !s.configured) return null
+  const run = (path: string, after?: (r: { url?: string; logged?: number; checked?: number }) => void) => {
+    setBusy(true); setError(null); setNote('')
+    api<{ url?: string; logged?: number; checked?: number }>(path, { method: 'POST' })
+      .then((r) => { if (r.url) window.location.href = r.url; else { after?.(r); void status.reload() } })
+      .catch((e: ApiError) => setError(e)).finally(() => setBusy(false))
+  }
+  return (
+    <>
+      <ErrorBanner error={error || status.error} onClose={() => setError(null)} />
+      <div className={`banner banner-${s.enabled && !s.error ? 'ok' : 'warn'}`} role="status">
+        <div>
+          {!s.enabled && <>Optional: log emails with your prospects automatically. The CRM reads only who, subject and date from your Gmail, never the message text, and adds each email to the prospect and their open deals.</>}
+          {s.enabled && !s.first_sync_done && !s.error && <>Gmail auto-logging is on. Looking through the last 30 days of your mail…</>}
+          {s.enabled && s.first_sync_done && <>Gmail auto-logging on: {s.logged_30_days} email{s.logged_30_days === 1 ? '' : 's'} with prospects logged in the last 30 days{s.synced_at ? ` · last checked ${fmtDateTime(s.synced_at)}` : ''}. Checked every hour.</>}
+          {s.enabled && s.error && <> Last check failed: {s.error}</>}
+          {note && <> {note}</>}
+        </div>
+        {s.enabled ? (
+          <span className="row" style={{ gap: 8 }}>
+            <button type="button" className="btn" disabled={busy} onClick={() => run('/gmail/sync', (r) => setNote(r.logged ? `Logged ${r.logged} new.` : 'Nothing new.'))}>{busy ? 'Checking…' : 'Sync now'}</button>
+            <button type="button" className="btn" disabled={busy} onClick={() => { if (window.confirm('Turn off Gmail auto-logging? Emails already logged stay on the records.')) run('/gmail/disable') }}>Turn off</button>
+          </span>
+        ) : <button type="button" className="btn btn-dark" disabled={busy} onClick={() => run('/gmail/enable')}>Turn on Gmail auto-logging</button>}
       </div>
     </>
   )
@@ -386,6 +430,7 @@ export default function Meetings() {
       <ErrorBanner error={status.error} />
       {status.data && <ConnectionBar status={status.data} onChange={() => void status.reload()} />}
       {status.data && <TasksBar key={String(status.data.connected)} />}
+      {status.data && <GmailBar key={`g${String(status.data.connected)}`} />}
       <Tabs<Tab> label="Meetings sections" value={tab} onChange={setTab}
         tabs={[{ value: 'schedule', label: 'Schedule a meeting' }, { value: 'booking', label: 'Booking links' }, { value: 'sync', label: 'Calendar sync status' }]} />
       {tab === 'schedule' && status.data && <ScheduleTab status={status.data} reloadStatus={() => void status.reload()} />}

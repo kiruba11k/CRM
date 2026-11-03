@@ -40,7 +40,14 @@ export interface SettingsChange { area: string; summary: string; changed_at: str
 
 export interface Issue { field: string; message: string }
 
-export interface Activity { id: string; kind: string; summary: string; occurred_at: string; created_by: string | null }
+export interface Activity {
+  id: string; kind: string; summary: string; occurred_at: string; created_by: string | null
+  created_by_id?: string | null; created_by_email?: string | null; email_direction?: 'in' | 'out' | null; gmail_thread_id?: string | null
+}
+export interface GmailStatus {
+  configured: boolean; connected: boolean; granted: boolean; enabled: boolean; first_sync_done: boolean
+  synced_at: string | null; error: string | null; logged_30_days: number
+}
 export interface HistoryEntry { field: string; old_value: string | null; new_value: string | null; changed_at: string; changed_by: string | null }
 
 export interface Account {

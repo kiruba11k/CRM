@@ -1,5 +1,6 @@
 """Daily digest email: personal preference, preview, test send and the
-scheduled run (called hourly by .github/workflows/daily-digest.yml)."""
+scheduled run (called hourly by .github/workflows/daily-digest.yml, which
+also runs Gmail auto-logging)."""
 import hmac
 from typing import Optional
 from uuid import UUID
@@ -83,9 +84,16 @@ async def run_now(con: asyncpg.Connection = Depends(get_con), user: User = Depen
 
 
 @router.post("/cron")
-async def cron(con: asyncpg.Connection = Depends(get_con), settings: Settings = Depends(get_settings),
+async def cron(request: Request, con: asyncpg.Connection = Depends(get_con), settings: Settings = Depends(get_settings),
                mailer: Mailer = Depends(get_mailer), x_cron_secret: Optional[str] = Header(default=None)):
     if not settings.cron_secret or not x_cron_secret or not hmac.compare_digest(x_cron_secret, settings.cron_secret):
         raise HTTPException(403, "Bad or missing X-Cron-Secret.")
     await listconfig.ensure_fresh(con, 0)
-    return await digest.run(con, mailer, settings.app_url)
+    # Gmail auto-logging rides on the same hourly call, before the digest so
+    # today's emails count as activity.
+    gmail = None
+    if not settings.calendar_missing:
+        from .. import gmailsync
+        from .calendar import _google
+        gmail = await gmailsync.sync_all(con, _google(request, settings), settings)
+    return {**await digest.run(con, mailer, settings.app_url), "gmail": gmail}
