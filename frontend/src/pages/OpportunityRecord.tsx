@@ -9,6 +9,7 @@ import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import { FollowUpStatus, MeetingsCard, TaskStatus } from '../components/Meetings'
 import { GmailCard } from '../components/Gmail'
+import Attachments from '../components/Attachments'
 import { StagePill } from '../theme'
 import type { Account, AccountDetail, FormValue, FormValues, Issue, OpportunityDetail, Prospect } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, TextField, WarningsBanner, changedFields, useLoad, withCurrent } from '../ui'
@@ -225,6 +226,7 @@ export default function OpportunityRecord() {
               </Link>
             ))}
           </section>
+          <Attachments entityType="opportunity" entityId={id} canEdit={canEdit} onChange={() => void reload()} />
           <GmailCard onChange={() => void reload()} entityType="opportunity" entityId={id} canEdit={canEdit} domain={domainOf(account?.website)}
             emails={primary?.email ? [primary.email] : contacts.map((p) => p.email || '')}
             subject={account && !data.name.toLowerCase().startsWith(account.name.toLowerCase().split(' ')[0]) ? `${account.name} — ${data.name}` : data.name} />

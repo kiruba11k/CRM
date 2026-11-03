@@ -6,6 +6,7 @@ import { GmailCard } from '../components/Gmail'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import EmailContacts from '../components/EmailContacts'
+import Attachments from '../components/Attachments'
 import type { AccountDetail, FormValue, FormValues } from '../types'
 import { Banner, ErrorBanner, OwnerField, SelectField, StatusPill, Tabs, TextField, changedFields, useLoad, withCurrent } from '../ui'
 
@@ -121,6 +122,7 @@ export default function AccountRecord() {
             <TextField label="Notes" multiline value={form.notes} onChange={(v) => set('notes', v)} hint="Avoid storing unnecessary sensitive information" />
             {!canEdit && <span className="muted small">Read-only: only the owner, a manager or an admin can edit.</span>}
           </section>
+          <Attachments entityType="account" entityId={id} canEdit={canEdit} onChange={() => void reload()} />
           <EmailContacts accountId={id} onAdded={() => void reload()} />
           <GmailCard onChange={() => void reload()} entityType="account" entityId={id} canEdit={canEdit} domain={domainOf(data.website)}
             emails={data.prospects.map((p) => p.email || '')} subject={`LeadStrategus × ${data.name}`} />

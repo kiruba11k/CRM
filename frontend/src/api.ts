@@ -108,3 +108,22 @@ export async function downloadFile(path: string, filename: string, forbidden = '
 export function downloadCsv(entity: 'accounts' | 'prospects' | 'opportunities' | 'history'): Promise<void> {
   return downloadFile(`/export/${entity}.csv`, `crm-${entity}.csv`, 'CSV export is for managers and admins.')
 }
+
+// Upload a file as the raw request body (no multipart), with the auth header.
+export async function uploadFile<T = unknown>(path: string, file: File, params: Params): Promise<T> {
+  const qs = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== '') qs.set(k, String(v))
+  const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': 'application/octet-stream' }
+  if (DEV_USER) headers['X-Dev-User'] = DEV_USER
+  else if (token) headers.Authorization = `Bearer ${token}`
+  let res: Response
+  try {
+    res = await fetch(`${BASE}/api${path}?${qs.toString()}`, { method: 'POST', headers, body: file, signal: AbortSignal.timeout(TIMEOUT_MS * 2) })
+  } catch {
+    throw new ApiError(0, 'Upload failed: can’t reach the CRM server. Try again in a minute.')
+  }
+  const isJson = (res.headers.get('content-type') || '').includes('application/json')
+  const data: unknown = isJson ? await res.json() : await res.text()
+  if (!res.ok) throw parseError(res.status, isJson ? data : { detail: data })
+  return data as T
+}

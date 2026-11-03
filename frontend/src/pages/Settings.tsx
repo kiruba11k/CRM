@@ -429,6 +429,25 @@ function DemoCard() {
   )
 }
 
+// Uploaded files live in the database; Neon's free plan holds 0.5 GB.
+function StorageUsage() {
+  const u = useLoad(() => api<{ files: number; links: number; bytes: number; db_bytes: number }>('/attachments/usage/summary'), [])
+  if (!u.data) return null
+  const mb = (b: number) => `${(b / 1048576).toFixed(b < 10485760 ? 1 : 0)} MB`
+  const pct = Math.min(100, (u.data.db_bytes / (512 * 1048576)) * 100)
+  return (
+    <>
+      <h2>File storage</h2>
+      <p className="muted small" style={{ margin: 0 }}>
+        {u.data.files} uploaded file{u.data.files === 1 ? '' : 's'} ({mb(u.data.bytes)}) and {u.data.links} link{u.data.links === 1 ? '' : 's'}.
+        The whole database uses {mb(u.data.db_bytes)} of the 512 MB on Neon’s free plan.
+      </p>
+      <div className="bar-track" aria-label={`${Math.round(pct)}% of the free plan used`}><div className="bar-fill" style={{ width: `${pct}%`, background: pct > 80 ? 'var(--red-ink)' : 'var(--series-1)' }} /></div>
+      <p className="muted small" style={{ margin: 0 }}>Files go in the database (up to 10 MB each). For large files, use Google Drive links, which take no space.</p>
+    </>
+  )
+}
+
 function DataTab() {
   const { user } = useSession()
   const [error, setError] = useState<ApiError | null>(null)
@@ -455,6 +474,7 @@ function DataTab() {
         <h2>Backup &amp; recovery</h2>
         <p className="muted small" style={{ margin: 0 }}>The database runs on Neon (PostgreSQL), which keeps a restore window for point-in-time recovery; its length depends on the Neon plan. Take a weekly CSV export as well until the pilot ends.</p>
         <p className="muted small" style={{ margin: 0 }}>Restore: in the Neon console, restore the branch to a point in time (or to a new branch), then point <span className="mono">CRM_DATABASE_URL</span> on Render at it.</p>
+        <StorageUsage />
         <h2>History &amp; audit</h2>
         <p className="muted small" style={{ margin: 0 }}>Kept for every record: stage changes, nurture on/off, risk rating, owner, value, close date, conversions from prospect to opportunity, and who made each change.</p>
       </section>

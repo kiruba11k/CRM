@@ -221,6 +221,7 @@ async def _move(con: asyncpg.Connection, entity: str, frm: UUID, to: UUID) -> di
     await run("emails", "UPDATE email_threads SET entity_id = $3 WHERE entity_type = $1 AND entity_id = $2")
     await run("history", "UPDATE record_history SET entity_id = $3 WHERE entity_type = $1 AND entity_id = $2")
     await run("tasks", "UPDATE task_links SET entity_id = $3 WHERE entity_type = $1 AND entity_id = $2")
+    await run("files", "UPDATE attachments SET entity_id = $3 WHERE entity_type = $1 AND entity_id = $2")
     return n
 
 
