@@ -100,4 +100,12 @@ async def cron(request: Request, con: asyncpg.Connection = Depends(get_con), set
         gmail = await gmailsync.sync_all(con, _google(request, settings), settings)
         from .. import tasksync
         await tasksync.pull_all(request, con, _google(request, settings), settings)
-    return {**await digest.run(con, mailer, settings.app_url), "gmail": gmail}
+    result = await digest.run(con, mailer, settings.app_url)
+    # Slack team summary: same time rule as the digest, once a day per channel.
+    local = digest.local_now()
+    rem = domain.REMINDERS
+    if settings.token_key and local.hour >= int(rem.get("digest_hour", 8)) and not (rem.get("digest_weekdays_only") and local.weekday() >= 5):
+        from .. import slack
+        result["slack"] = await slack.daily_summary(con, request.app.state.pool, settings.token_key, settings.app_url, local.date(),
+                                                   transport=getattr(request.app.state, "slack_transport", None))
+    return {**result, "gmail": gmail}

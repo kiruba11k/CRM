@@ -6,10 +6,11 @@ import { ApiError, api, downloadCsv } from '../api'
 import { fmtDateTime } from '../format'
 import { can, useSession } from '../session'
 import PeopleAccess from '../components/PeopleAccess'
+import SlackSettings from '../components/SlackSettings'
 import type { CalendarStatus, ChecklistItem, DigestMe, DigestPreview, EditableList, ReminderSettings, SettingsChange, SettingsView } from '../types'
 import { Banner, ErrorBanner, Tabs, TextField, useLoad } from '../ui'
 
-type Tab = 'lists' | 'reminders' | 'roles' | 'integrations' | 'data' | 'launch' | 'log'
+type Tab = 'lists' | 'reminders' | 'roles' | 'integrations' | 'slack' | 'data' | 'launch' | 'log'
 type Tag = 'required' | 'confirm' | 'configurable'
 
 const TAG: Record<Tag, { label: string; pill: string }> = {
@@ -573,7 +574,7 @@ export default function Settings() {
       </div>
       <Tabs<Tab> label="Settings sections" value={tab} onChange={setTab} tabs={[
         { value: 'lists', label: 'Controlled lists' }, { value: 'reminders', label: 'Reminders' }, { value: 'roles', label: 'People & access' },
-        { value: 'integrations', label: 'Google integrations' }, { value: 'data', label: 'Export & backup' }, { value: 'launch', label: 'Launch checklist' },
+        { value: 'integrations', label: 'Google integrations' }, { value: 'slack', label: 'Slack' }, { value: 'data', label: 'Export & backup' }, { value: 'launch', label: 'Launch checklist' },
         { value: 'log', label: 'Change log' },
       ]} />
       {needsView && <ErrorBanner error={settings.error} />}
@@ -581,6 +582,7 @@ export default function Settings() {
       {tab === 'lists' && current && <ListsTab view={current} onView={setView} />}
       {tab === 'reminders' && current && <RemindersTab view={current} onView={setView} />}
       {tab === 'roles' && <PeopleAccess />}
+      {tab === 'slack' && <SlackSettings />}
       {tab === 'integrations' && <IntegrationsTab />}
       {tab === 'data' && <DataTab />}
       {tab === 'launch' && <LaunchTab />}

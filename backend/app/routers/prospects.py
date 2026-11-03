@@ -5,7 +5,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .. import domain, followups, integrations, tasksync
+from .. import domain, followups, integrations, slack, tasksync
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
 from ..records import activities, get_or_404, history, insert, log_activity, raise_if_errors, record_changes, update
 from ..schemas import CompleteActionIn, ConvertProspectIn, NoteIn, ProspectIn, ProspectPatch
@@ -163,4 +163,5 @@ async def convert_to_opportunity(
         await record_changes(con, "prospect", prospect_id, p, row, user.id)
         await log_activity(con, "prospect", prospect_id, "converted", f"Opportunity created: {opp['name']}", user.id)
     await integrations.after_save(request, con, "opportunity", opp["id"])
+    slack.deal_event(request, None, opp, user.name)
     return opp

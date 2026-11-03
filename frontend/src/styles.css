@@ -681,3 +681,14 @@ main.main:has(.bulk-bar) { padding-bottom: 140px; }
 .attach-link .input { flex: 1 1 200px; min-height: 40px; }
 .icon-btn { flex: none; width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--ink-soft); font-size: 18px; line-height: 1; cursor: pointer; }
 .icon-btn:hover { background: var(--red-soft); color: var(--red-ink); }
+
+/* Slack */
+.slack-steps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; color: var(--ink-soft); }
+.slack-channel { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.slack-channel.off { opacity: .65; }
+.slack-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.slack-name { font-weight: 800; font-size: 15px; }
+.slack-events { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.slack-events .check { min-height: 30px; }
+.slack-msg { color: var(--ink-soft); overflow-wrap: anywhere; }
+.field > .label { font-size: 13px; font-weight: 600; }
