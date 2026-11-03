@@ -5,10 +5,11 @@ import { domainOf, fmtDate, money, moneyByCurrency, nextActionLabel, totalsByCur
 import { GmailCard } from '../components/Gmail'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
+import EmailContacts from '../components/EmailContacts'
 import type { AccountDetail, FormValue, FormValues } from '../types'
 import { Banner, ErrorBanner, OwnerField, SelectField, StatusPill, Tabs, TextField, changedFields, useLoad, withCurrent } from '../ui'
 
-const EDITABLE = ['name', 'country', 'region', 'industry', 'owner_id', 'status', 'website', 'linkedin_url', 'notes'] as const
+const EDITABLE = ['name', 'country', 'region', 'industry', 'owner_id', 'status', 'website', 'linkedin_url', 'email_domains', 'notes'] as const
 type Tab = 'opps' | 'people' | 'activity'
 
 export default function AccountRecord() {
@@ -102,7 +103,7 @@ export default function AccountRecord() {
               {data.prospects.length === 0 && <div className="empty">No prospects yet.</div>}
             </div>
           )}
-          {tab === 'activity' && <ActivityCard activities={data.activities} />}
+          {tab === 'activity' && <ActivityCard activities={data.activities} onAdded={() => void reload()} />}
         </div>
         <div className="col-side">
           <section className="card" aria-label="Account details">
@@ -115,9 +116,12 @@ export default function AccountRecord() {
             <OwnerField label="Account owner" required={false} value={form.owner_id} onChange={(v) => set('owner_id', v)} error={errors.owner_id} />
             <TextField label="Website" value={form.website} onChange={(v) => set('website', v)} />
             <TextField label="LinkedIn company URL" value={form.linkedin_url} onChange={(v) => set('linkedin_url', v)} />
+            <TextField label="Other email domains" value={form.email_domains} onChange={(v) => set('email_domains', v)} placeholder="e.g. norvale-group.com"
+              hint="Only if people here use an email domain other than the website's. Comma-separated. Used by Gmail auto-logging." />
             <TextField label="Notes" multiline value={form.notes} onChange={(v) => set('notes', v)} hint="Avoid storing unnecessary sensitive information" />
             {!canEdit && <span className="muted small">Read-only: only the owner, a manager or an admin can edit.</span>}
           </section>
+          <EmailContacts accountId={id} onAdded={() => void reload()} />
           <GmailCard onChange={() => void reload()} entityType="account" entityId={id} canEdit={canEdit} domain={domainOf(data.website)}
             emails={data.prospects.map((p) => p.email || '')} subject={`LeadStrategus × ${data.name}`} />
           <HistoryCard history={data.history} />

@@ -5,7 +5,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 
-from .. import domain
+from .. import domain, emaildomains
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
 from ..records import activities, get_or_404, history, insert, raise_if_errors, record_changes, update
 from ..schemas import AccountIn, AccountPatch
@@ -51,6 +51,7 @@ async def possible_duplicates(name: str, con: asyncpg.Connection = Depends(get_c
 @router.post("", status_code=201)
 async def create_account(body: AccountIn, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
     data = body.model_dump()
+    data["email_domains"] = emaildomains.clean_list(data.get("email_domains"))
     data["owner_id"] = data["owner_id"] or UUID(user.id)
     ensure_can_assign(user, data["owner_id"])
     errors, warnings = domain.validate_account(data)
@@ -94,6 +95,8 @@ async def update_account(
     before = await get_or_404(con, "accounts", account_id, "Account")
     ensure_can_edit(user, before["owner_id"])
     patch = body.model_dump(exclude_unset=True)
+    if "email_domains" in patch:
+        patch["email_domains"] = emaildomains.clean_list(patch["email_domains"])
     if "owner_id" in patch:
         ensure_can_assign(user, patch["owner_id"])
     merged = {**before, **patch}
@@ -108,3 +111,18 @@ async def update_account(
         row = await update(con, "accounts", account_id, patch)
         await record_changes(con, "account", account_id, before, row, user.id)
     return {**row, "warnings": warnings}
+
+
+@router.get("/{account_id}/email-contacts")
+async def email_contacts(account_id: UUID, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+    """People at this company the team has emailed (auto-logged by domain)
+    who aren't prospects yet: suggestions to add."""
+    await get_or_404(con, "accounts", account_id, "Account")
+    rows = await con.fetch(
+        "SELECT lower(a.addr) AS email, count(*) AS emails, max(x.occurred_at) AS last_at, "
+        "array_agg(DISTINCT u.name) FILTER (WHERE u.name IS NOT NULL) AS colleagues "
+        "FROM activities x CROSS JOIN LATERAL unnest(x.email_addresses) AS a(addr) LEFT JOIN users u ON u.id = x.created_by "
+        "WHERE x.entity_type = 'account' AND x.entity_id = $1 AND x.email_addresses IS NOT NULL "
+        "AND NOT EXISTS (SELECT 1 FROM prospects p WHERE lower(p.email) = lower(a.addr)) "
+        "GROUP BY lower(a.addr) ORDER BY max(x.occurred_at) DESC LIMIT 20", account_id)
+    return [dict(r) for r in rows]

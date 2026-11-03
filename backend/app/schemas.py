@@ -30,6 +30,7 @@ class AccountIn(_In):
     status: str = "Target"
     website: Optional[str] = None
     linkedin_url: Optional[str] = None
+    email_domains: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -42,6 +43,7 @@ class AccountPatch(_In):
     status: Optional[str] = None
     website: Optional[str] = None
     linkedin_url: Optional[str] = None
+    email_domains: Optional[str] = None
     notes: Optional[str] = None
 
 

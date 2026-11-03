@@ -59,7 +59,7 @@ export interface HistoryEntry { field: string; old_value: string | null; new_val
 
 export interface Account {
   id: string; name: string; country: string; region: string | null; industry: string | null; owner_id: string | null
-  status: string; website: string | null; linkedin_url: string | null; notes: string | null
+  status: string; website: string | null; linkedin_url: string | null; email_domains?: string | null; notes: string | null
   owner_name?: string | null; prospect_count?: number; open_count?: number; won_count?: number
 }
 

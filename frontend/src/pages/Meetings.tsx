@@ -96,7 +96,7 @@ function GmailBar() {
       <ErrorBanner error={error || status.error} onClose={() => setError(null)} />
       <div className={`banner banner-${s.enabled && !s.error ? 'ok' : 'warn'}`} role="status">
         <div>
-          {!s.enabled && <>Optional: log emails with your prospects automatically. The CRM reads only who, subject and date from your Gmail, never the message text, and adds each email to the prospect and their open deals.</>}
+          {!s.enabled && <>Optional: log emails with your prospects automatically. The CRM reads only who, subject and date from your Gmail, never the message text. Emails with a prospect go on the prospect and their open deals; emails with anyone else at a known company go on that account.</>}
           {s.enabled && !s.first_sync_done && !s.error && <>Gmail auto-logging is on. Looking through the last 30 days of your mail…</>}
           {s.enabled && s.first_sync_done && <>Gmail auto-logging on: {s.logged_30_days} email{s.logged_30_days === 1 ? '' : 's'} with prospects logged in the last 30 days{s.synced_at ? ` · last checked ${fmtDateTime(s.synced_at)}` : ''}. Checked every hour.</>}
           {s.enabled && s.error && <> Last check failed: {s.error}</>}

@@ -661,3 +661,7 @@ main.main:has(.bulk-bar) { padding-bottom: 140px; }
 .sw.hollow { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--ink-soft); }
 .wr { display: flex; align-items: center; gap: 8px; min-width: 140px; }
 .wr .bar-track { flex: 1; }
+.contact-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+.contact-row > div:first-child { display: flex; flex-direction: column; }
+.contact-email { overflow-wrap: anywhere; }
+.contact-row .person-form { flex: 1 1 100%; }

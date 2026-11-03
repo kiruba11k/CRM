@@ -3,7 +3,8 @@ backend/app/alerts.py - "going quiet" alerts for open deals.
 
 An open, non-nurtured opportunity is flagged when:
   quiet     nothing has happened on it for `stale_days` (admin setting):
-            no activity, field change, linked email or past meeting;
+            no activity, field change, linked email or past meeting, and no
+            auto-logged email with anyone at its company;
   overdue   its expected close date has passed;
   slipping  its close date has been pushed later two or more times.
 """
@@ -25,6 +26,8 @@ SELECT o.id, o.name, a.name AS account_name, o.owner_id, u.name AS owner_name, o
          (SELECT max(x.occurred_at) FROM activities x WHERE x.entity_type = 'opportunity' AND x.entity_id = o.id),
          (SELECT max(h.changed_at) FROM record_history h WHERE h.entity_type = 'opportunity' AND h.entity_id = o.id),
          (SELECT max(e.linked_at) FROM email_threads e WHERE e.entity_type = 'opportunity' AND e.entity_id = o.id),
+         (SELECT max(x.occurred_at) FROM activities x WHERE x.entity_type = 'account' AND x.entity_id = o.account_id
+                                                      AND x.kind = 'email' AND x.occurred_at <= now()),
          (SELECT max(m.starts_at) FROM meetings m WHERE m.entity_type = 'opportunity' AND m.entity_id = o.id
                                                     AND NOT m.cancelled AND m.starts_at <= now())
        ) AS last_touch,
