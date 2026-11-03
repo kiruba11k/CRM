@@ -5,7 +5,12 @@ import { ApiError, api, downloadCsv } from '../api'
 import { useSession } from '../session'
 import type { Account } from '../types'
 import { BulkBar, RowBox, SelectAllBox, useSelection } from '../components/Bulk'
+import SavedViews from '../components/SavedViews'
+import type { SortDir } from '../theme'
 import { ErrorBanner, SelectField, Tabs, TextField, useLoad } from '../ui'
+
+type ViewState = { status: string; country: string | null; q: string; sort_key: string; sort_dir: SortDir }
+const DEFAULT_VIEW: ViewState = { status: 'all', country: null, q: '', sort_key: 'name', sort_dir: 'asc' }
 
 const STATUS_PILL: Record<string, string> = { Target: 'blue', 'Active customer': 'teal', 'Inactive / do not pursue': 'paper' }
 
@@ -21,7 +26,7 @@ export default function Accounts() {
     && (!q || `${a.name} ${a.industry || ''}`.toLowerCase().includes(q.toLowerCase()))), [rows, status, country, q])
   const countries = [...new Set(rows.map((a) => a.country))].sort()
   const navigate = useNavigate()
-  const { sorted, sort, by } = useSort(filtered, { key: 'name', dir: 'asc' }, {
+  const { sorted, sort, by, setSort } = useSort(filtered, { key: 'name', dir: 'asc' }, {
     name: (a) => a.name, status: (a) => a.status, country: (a) => a.country, owner: (a) => a.owner_name,
     prospects: (a) => a.prospect_count ?? 0, open: (a) => a.open_count ?? 0, won: (a) => a.won_count ?? 0,
   })
@@ -40,6 +45,8 @@ export default function Accounts() {
         </div>
       </div>
       <ErrorBanner error={exportError} onClose={() => setExportError(null)} />
+      <SavedViews<ViewState> page="accounts" defaults={DEFAULT_VIEW} value={{ status, country, q, sort_key: sort.key, sort_dir: sort.dir }}
+        onApply={(v) => { setStatus(v.status); setCountry(v.country); setQ(v.q); setSort({ key: v.sort_key, dir: v.sort_dir }) }} />
       <Tabs label="Account status" value={status} onChange={setStatus}
         tabs={[{ value: 'all', label: 'All accounts', count: rows.length }, ...lists.account_statuses.map((s) => ({ value: s, label: s, count: rows.filter((a) => a.status === s).length }))]} />
       <div className="row-end">

@@ -14,10 +14,13 @@ import { useToast } from '../components/Toast'
 import { fmtDate, money, moneyByCurrency, todayIso, totalsByCurrency } from '../format'
 import { useSession } from '../session'
 import type { FieldErrors, Opportunity, PipelineReport, StaleResponse } from '../types'
+import SavedViews from '../components/SavedViews'
 import { ErrorBanner, RiskPill, SelectField, useLoad } from '../ui'
 
 
 interface Filters { owner: string | null; risk: string | null; service: string | null }
+type ViewState = Filters & { nurture: boolean }
+const DEFAULT_VIEW: ViewState = { owner: null, risk: null, service: null, nurture: false }
 
 function cardFooter(o: Opportunity, closed: boolean, overdue: boolean): string {
   if (closed) return o.stage === 'Won' ? `Won ${fmtDate(o.won_date)} · ${money(o.actual_value, o.currency)}` : `Lost ${fmtDate(o.lost_date)} · ${o.lost_reason}`
@@ -99,6 +102,8 @@ export default function Pipeline() {
           <div className="tile"><span className="k">On nurture</span><span className="v" style={{ fontSize: 18, color: 'var(--purple-ink)' }}>{moneyByCurrency(report.data.nurture.value)}</span><span className="s">{report.data.nurture.count} opportunities · <Link to="/views">Nurture pipeline</Link></span></div>
         </section>
       )}
+      <SavedViews<ViewState> page="pipeline" defaults={DEFAULT_VIEW} value={{ ...f, nurture: showNurture }}
+        onApply={({ nurture, ...rest }) => { setF(rest); setShowNurture(nurture) }} />
       <div className="row-end">
         <div style={{ width: 180 }}><SelectField label="Owner" value={f.owner} onChange={(owner) => setF({ ...f, owner })} placeholder="All owners" options={users.map((u) => ({ value: u.id, label: u.name }))} /></div>
         <div style={{ width: 180 }}><SelectField label="Risk rating" value={f.risk} onChange={(risk) => setF({ ...f, risk })} placeholder="All ratings" options={lists.risk_ratings} /></div>

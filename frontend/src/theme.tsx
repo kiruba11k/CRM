@@ -79,7 +79,7 @@ export function useSort<T>(rows: T[], initial: { key: string; dir: SortDir }, ge
     })
   }, [rows, sort, getters])
   const by = (key: string) => setSort((s) => ({ key, dir: s.key === key && s.dir === 'asc' ? 'desc' : 'asc' }))
-  return { sorted, sort, by }
+  return { sorted, sort, by, setSort }
 }
 
 export function SortTh({ label, k, sort, by, num }: { label: ReactNode; k: string; sort: { key: string; dir: SortDir }; by: (k: string) => void; num?: boolean }) {

@@ -221,3 +221,10 @@ export interface DigestMe {
   last: { digest_date: string; status: 'sending' | 'sent' | 'failed' | 'skipped'; detail: string | null; updated_at: string } | null
 }
 export interface DigestPreview { subject: string; html: string; text: string; worth_sending: boolean; counts: Record<string, number> }
+
+// Saved views
+export type SavedViewPage = 'prospects' | 'accounts' | 'pipeline'
+export interface SavedView {
+  id: string; page: SavedViewPage; name: string; filters: Record<string, unknown>; shared: boolean
+  owner_id: string; owner_name: string; mine: boolean; is_default: boolean; updated_at: string
+}

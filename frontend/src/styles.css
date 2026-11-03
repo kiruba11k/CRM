@@ -583,3 +583,31 @@ tr.row-selected td { background: var(--accent-soft) !important; }
 .bulk-result li { margin: 2px 0; }
 main.main:has(.bulk-bar) { padding-bottom: 140px; }
 .bulk-actions .btn, .bulk-clear { white-space: nowrap; }
+
+/* Saved views bar */
+.saved-views { position: relative; display: flex; flex-direction: column; gap: 8px; }
+.sv-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sv-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-soft); margin-right: 4px; }
+.sv-chip-wrap { display: inline-flex; align-items: center; border-radius: 999px; }
+.sv-chip-wrap.on { background: var(--accent-soft); }
+.sv-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast); }
+.sv-chip:hover { border-color: var(--accent); }
+.sv-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.sv-chip-wrap.on .sv-chip { border-radius: 999px 0 0 999px; }
+.sv-more { min-height: 34px; padding: 0 10px; border: 1px solid var(--accent); border-left: 0; border-radius: 0 999px 999px 0; background: var(--accent-soft); color: var(--accent-ink); font-weight: 800; cursor: pointer; }
+.sv-tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; background: var(--paper); color: var(--ink-soft); }
+.sv-chip.on .sv-tag { background: rgba(255, 255, 255, .22); color: #fff; }
+.sv-star { color: #F59E0B; }
+.sv-chip.on .sv-star { color: #FDE68A; }
+.sv-dot { width: 7px; height: 7px; border-radius: 50%; background: #F59E0B; }
+.sv-spacer { flex: 1; }
+.sv-btn { min-height: 34px; }
+.sv-menu { position: absolute; top: 44px; left: 60px; z-index: 30; min-width: 230px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(15, 17, 35, .16); padding: 6px; display: flex; flex-direction: column; }
+.sv-menu button { text-align: left; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); padding: 9px 10px; border-radius: 8px; cursor: pointer; }
+.sv-menu button:hover { background: var(--paper); }
+.sv-menu button.danger { color: var(--red-ink); }
+.sv-save { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-row); }
+.sv-save .input { flex: 1 1 260px; min-height: 40px; }

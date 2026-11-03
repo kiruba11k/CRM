@@ -7,10 +7,14 @@ import { fmtDate, nextActionLabel, todayIso } from '../format'
 import { useSession } from '../session'
 import type { Prospect } from '../types'
 import { BulkBar, RowBox, SelectAllBox, useSelection } from '../components/Bulk'
+import SavedViews from '../components/SavedViews'
+import type { SortDir } from '../theme'
 import { CountUp, ErrorBanner, SelectField, StatusPill, Tabs, TextField, useLoad } from '../ui'
 
 type Scope = 'mine' | 'all' | 'unlinked'
 interface Filters { status: string | null; country: string | null; source: string | null; next_action: string | null; q: string }
+type ViewState = Filters & { scope: Scope; sort_key: string; sort_dir: SortDir }
+const DEFAULT_VIEW: ViewState = { scope: 'mine', status: null, country: null, source: null, next_action: null, q: '', sort_key: 'due', sort_dir: 'asc' }
 
 export default function Prospects() {
   const { lists } = useSession()
@@ -27,7 +31,7 @@ export default function Prospects() {
     && (!f.q || `${p.full_name} ${p.email || ''} ${p.account_name || ''}`.toLowerCase().includes(f.q.toLowerCase()))), [rows, f])
   const countries = [...new Set(rows.map((p) => p.geography).filter((g): g is string => !!g))].sort()
   const navigate = useNavigate()
-  const { sorted, sort, by } = useSort(filtered, { key: 'due', dir: 'asc' }, {
+  const { sorted, sort, by, setSort } = useSort(filtered, { key: 'due', dir: 'asc' }, {
     name: (p) => p.full_name, account: (p) => p.account_name, status: (p) => lists.prospect_statuses.indexOf(p.status),
     source: (p) => p.source, geo: (p) => p.geography, owner: (p) => p.owner_name, due: (p) => p.next_action_due,
   })
@@ -58,7 +62,11 @@ export default function Prospects() {
         ))}
       </section>
 
-      <Tabs<Scope> label="Saved views" value={scope} onChange={setScope}
+      <SavedViews<ViewState> page="prospects" defaults={DEFAULT_VIEW}
+        value={{ scope, ...f, sort_key: sort.key, sort_dir: sort.dir }}
+        onApply={({ scope: sc, sort_key, sort_dir, ...rest }) => { setScope(sc); setF(rest); setSort({ key: sort_key, dir: sort_dir }) }} />
+
+      <Tabs<Scope> label="Whose prospects" value={scope} onChange={setScope}
         tabs={[{ value: 'mine', label: 'My prospects' }, { value: 'all', label: 'All prospects' }, { value: 'unlinked', label: 'No account yet' }]} />
 
       <div className="grid-fields" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
