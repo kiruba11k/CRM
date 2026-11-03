@@ -19,6 +19,7 @@ import Reports from './pages/Reports'
 import Meetings from './pages/Meetings'
 import Settings from './pages/Settings'
 import Import from './pages/Import'
+import CsvImport from './pages/CsvImport'
 import Cleanup from './pages/Cleanup'
 
 // Icon rail: [path, full name (tooltip + screen readers), short label, icon path].
@@ -38,7 +39,7 @@ const NAV: NavItem[][] = [
   [
     ['/meetings', 'Meetings & booking', 'Meetings', 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2'],
     ['/settings', 'Settings', 'Settings', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4'],
-    ['/import', 'Import from HubSpot', 'Import', 'M12 3v12M7 10l5 5 5-5M5 21h14'],
+    ['/import', 'Import (CSV or HubSpot)', 'Import', 'M12 3v12M7 10l5 5 5-5M5 21h14'],
   ],
 ]
 
@@ -160,7 +161,8 @@ export default function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/meetings" element={<Meetings />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/import" element={<Import />} />
+          <Route path="/import" element={<CsvImport />} />
+          <Route path="/import/hubspot" element={<Import />} />
           <Route path="/cleanup" element={<Cleanup />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

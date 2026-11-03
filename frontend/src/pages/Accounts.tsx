@@ -32,7 +32,10 @@ export default function Accounts() {
           <h1>Accounts</h1>
           <p>One record per company. Each account can have many prospects and many opportunities.</p>
         </div>
-        <button type="button" className="btn" onClick={() => downloadCsv('accounts').catch((e: ApiError) => setExportError(e))}>Export CSV</button>
+        <div className="row">
+          <Link className="btn" to="/import?entity=accounts">Import CSV</Link>
+          <button type="button" className="btn" onClick={() => downloadCsv('accounts').catch((e: ApiError) => setExportError(e))}>Export CSV</button>
+        </div>
       </div>
       <ErrorBanner error={exportError} onClose={() => setExportError(null)} />
       <Tabs label="Account status" value={status} onChange={setStatus}

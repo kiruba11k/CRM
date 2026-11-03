@@ -8,6 +8,7 @@ import { fmtDateTime } from '../format'
 import { useSession } from '../session'
 import type { HubSpotSummary, HubSpotTest, ImportObject, ImportRun, ImportStatus, QualityIssue } from '../types'
 import { Banner, ErrorBanner, SelectField, useLoad } from '../ui'
+import { ImportTabs } from './CsvImport'
 
 const STEPS = ['Connect', 'Choose objects', 'Map stages & fields', 'Data quality', 'Import']
 
@@ -140,10 +141,11 @@ export default function Import() {
     <>
       <div className="page-head">
         <div>
-          <h1>Import from HubSpot</h1>
-          <p>Bring companies, contacts, deals and activity history into Accounts, Prospects and Opportunities. Every record keeps its HubSpot ID, so the import can be re-run during the pilot.</p>
+          <h1>Import</h1>
+          <p>Bring companies, contacts, deals and activity history from HubSpot into Accounts, Prospects and Opportunities. Every record keeps its HubSpot ID, so the import can be re-run during the pilot.</p>
         </div>
       </div>
+      <ImportTabs active="hubspot" />
       {!admin && <Banner kind="warn">Only admins can run the import. Imported records that need attention appear in <Link to="/cleanup">Needs cleanup</Link>.</Banner>}
       {admin && <>
         <ErrorBanner error={status.error || error} onClose={() => setError(null)} />

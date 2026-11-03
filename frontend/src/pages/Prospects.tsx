@@ -38,7 +38,10 @@ export default function Prospects() {
           <h1>Prospects</h1>
           <p>People you may contact or are engaging. A prospect can exist before any opportunity. Create one only when a specific piece of business can be tracked.</p>
         </div>
-        <button type="button" className="btn" onClick={() => downloadCsv('prospects').catch((e: ApiError) => setExportError(e))}>Export CSV</button>
+        <div className="row">
+          <Link className="btn" to="/import?entity=prospects">Import CSV</Link>
+          <button type="button" className="btn" onClick={() => downloadCsv('prospects').catch((e: ApiError) => setExportError(e))}>Export CSV</button>
+        </div>
       </div>
       <ErrorBanner error={exportError} onClose={() => setExportError(null)} />
 

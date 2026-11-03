@@ -51,7 +51,7 @@ def _run_out(row: asyncpg.Record, with_errors: bool = False) -> dict:
 
 @router.get("/hubspot/status")
 async def status(con: asyncpg.Connection = Depends(get_con), settings: Settings = Depends(get_settings), user: User = Depends(require_admin)):
-    last = await con.fetchrow(f"SELECT {_RUN_COLS} FROM import_runs ORDER BY started_at DESC LIMIT 1")
+    last = await con.fetchrow(f"SELECT {_RUN_COLS} FROM import_runs WHERE source = 'hubspot' ORDER BY started_at DESC LIMIT 1")
     return {"configured": bool(settings.hubspot_token), "last_run": _run_out(last) if last else None}
 
 
@@ -195,7 +195,7 @@ async def start_run(body: RunIn, request: Request, con: asyncpg.Connection = Dep
 
 @router.get("/hubspot/runs")
 async def list_runs(con: asyncpg.Connection = Depends(get_con), user: User = Depends(require_admin)):
-    return [_run_out(r) for r in await con.fetch(f"SELECT {_RUN_COLS} FROM import_runs ORDER BY started_at DESC LIMIT 20")]
+    return [_run_out(r) for r in await con.fetch(f"SELECT {_RUN_COLS} FROM import_runs WHERE source = 'hubspot' ORDER BY started_at DESC LIMIT 20")]
 
 
 @router.get("/hubspot/runs/{run_id}")

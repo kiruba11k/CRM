@@ -87,6 +87,7 @@ export default function Pipeline() {
           <h1>Pipeline</h1>
           <p>Open opportunities by sales stage. Drag a card to another stage to move it, or open it to edit. Nurtured opportunities keep their stage but are left out of the active board and forecast.</p>
         </div>
+        <Link className="btn" to="/import?entity=opportunities">Import CSV</Link>
       </div>
       {report.data && (
         <section className="tiles" aria-label="Active forecast">
