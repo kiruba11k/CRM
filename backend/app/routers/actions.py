@@ -48,13 +48,21 @@ async def my_actions(
 
 async def collect(con: asyncpg.Connection, owner: Optional[UUID], today: date) -> dict:
     """Open next actions for one owner (or everyone), grouped by urgency."""
-    sections = {"overdue": [], "today": [], "upcoming": [], "nurture": []}
+    sections = {"done_in_google": [], "overdue": [], "today": [], "upcoming": [], "nurture": []}
     rem = domain.REMINDERS
+    done = {(r["entity_type"], r["entity_id"]) for r in await con.fetch(
+        "SELECT entity_type, entity_id FROM task_links WHERE active AND completed_in_google_at IS NOT NULL")}
     for r in await con.fetch(_SQL, owner):
         item = dict(r)
         item["label"] = domain.next_action_label(item["code"], item["other"])
         due = item["due"]
-        if item["kind"] == "nurture":
+        if (("prospect" if item["kind"] == "prospect" else "opportunity"), item["id"]) in done:
+            # Ticked off in Google Tasks: waiting for the owner to set the next action.
+            item["done_in_google"] = True
+            if item["kind"] != "nurture" and due < today:
+                item["business_days_overdue"] = domain.business_days_between(due, today)
+            sections["done_in_google"].append(item)
+        elif item["kind"] == "nurture":
             item["days_until"] = (due - today).days if due else None
             sections["nurture"].append(item)
         elif due < today:

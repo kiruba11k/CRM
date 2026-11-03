@@ -1,5 +1,5 @@
 """
-backend/app/tasksync.py - §6.3 one-way sync of next actions to Google Tasks.
+backend/app/tasksync.py - §6.3 sync of next actions with Google Tasks.
 
 A user who turns Tasks on gets a "LeadStrategus CRM" list in Google Tasks.
 Every open next action they own (or nurture revisit) is one task there,
@@ -11,9 +11,12 @@ context and link in its notes. After every save of a record:
 - record closed, action removed, Tasks turned off → the task is deleted
 - owner changed            → deleted from the old owner's list, created in the new one's
 
-One-way by design: nothing done in Google Tasks changes the CRM. A task is
-shown as synced only after Google confirms it; failures stay visible with
-a retry. Google Tasks has no client-chosen IDs, so a retried create first
+Two-way where it's safe (pull_user): ticking a task off in Google flags the
+record "done in Google" so its owner picks the next action in the CRM (every
+open record must have one, so the CRM never invents it); changing the due
+date in Google reschedules the action; deleting the task stops syncing it
+until the action changes. Titles and notes stay CRM-owned. A task is shown
+as synced only after Google confirms it; failures stay visible with a retry. Google Tasks has no client-chosen IDs, so a retried create first
 looks for the task an unanswered attempt made (by a marker in its notes).
 """
 import asyncio
@@ -30,7 +33,7 @@ from .config import Settings
 LIST_TITLE = "LeadStrategus CRM"
 _TABLE = {"prospect": "prospects", "opportunity": "opportunities"}
 _PATH = {"prospect": "prospects", "opportunity": "opportunities"}
-FOOTER = "Managed by LeadStrategus CRM: update the action there; changes made here are not copied back."
+FOOTER = "Managed by LeadStrategus CRM. Tick it off or change its date here and the CRM follows; change the action itself in the CRM."
 
 
 def marker(link_id: UUID) -> str:
@@ -156,12 +159,20 @@ async def reconcile(request: Request, con: asyncpg.Connection, entity_type: str,
             want = None
         existing = await con.fetchrow("SELECT * FROM task_links WHERE entity_type = $1 AND entity_id = $2 AND active", entity_type, entity_id)
         ops: list[tuple[UUID, str]] = []
+        want_title = (await calendar.default_title(con, entity_type, entity_id, domain.next_action_title(want["code"], want["other"]))
+                      if want else None)
+        if existing is not None and existing["completed_in_google_at"] and (
+                completed or not want or (want["due"], want_title) != (existing["due"], existing["title"])):
+            # Ticked off in Google and the action has now moved on in the CRM:
+            # that task is finished; the new action gets a new task.
+            await con.execute("UPDATE task_links SET active = false, sync_status = 'completed', updated_at = now() WHERE id = $1", existing["id"])
+            existing = None
         if existing is not None and (completed or not want or existing["owner_id"] != want["owner_id"]):
             await con.execute("UPDATE task_links SET active = false, updated_at = now() WHERE id = $1", existing["id"])
             ops.append((existing["id"], "complete" if completed else "delete"))
             existing = None
         if want:
-            title = await calendar.default_title(con, entity_type, entity_id, domain.next_action_title(want["code"], want["other"]))
+            title = want_title
             context, _ = await calendar.record_context(con, entity_type, entity_id)
             link = f"{settings.app_url}/{_PATH[entity_type]}/{entity_id}"
             notes = gc.event_description(context, None, link) + "\n\n" + FOOTER
@@ -181,6 +192,84 @@ async def reconcile(request: Request, con: asyncpg.Connection, entity_type: str,
                 await sync_link(con, google, settings, link_id, action)
     except Exception:  # noqa: BLE001 - the record is saved; the task shows its own state
         logger.exception(f"Google Tasks sync failed for {entity_type} {entity_id}")
+
+
+# ── Reading back from Google ──────────────────────────────────────────
+
+PULL_EVERY = 60   # seconds between pulls for one person (My Actions calls it on load)
+
+
+async def pull_user(request: Request, con: asyncpg.Connection, google: gc.Google, settings: Settings, user_id: UUID,
+                    force: bool = False) -> dict:
+    from datetime import date as _date, datetime as _dt, timedelta, timezone
+
+    conn = await con.fetchrow("SELECT * FROM calendar_connections WHERE user_id = $1", user_id)
+    if conn is None or conn["status"] != "connected" or not conn["tasks_enabled"] or not conn["tasks_list_id"]:
+        return {"status": "off", "done": 0, "rescheduled": 0, "removed": 0}
+    now = _dt.now(timezone.utc)
+    if not force and conn["tasks_pulled_at"] and (now - conn["tasks_pulled_at"]).total_seconds() < PULL_EVERY:
+        return {"status": "recent", "done": 0, "rescheduled": 0, "removed": 0}
+    since = (conn["tasks_pulled_at"] - timedelta(minutes=5)).isoformat() if conn["tasks_pulled_at"] else None
+    try:
+        refresh = gc.decrypt(settings.token_key, conn["refresh_token_encrypted"])
+        tasks = await google.list_tasks(refresh, conn["tasks_list_id"], since)
+    except gc.CalendarError as e:
+        await con.execute("UPDATE calendar_connections SET last_error = $2, status = CASE WHEN $3 THEN 'needs_reconnect' ELSE status END WHERE user_id = $1",
+                          user_id, e.message, e.reconnect)
+        return {"status": "error", "error": e.message, "done": 0, "rescheduled": 0, "removed": 0}
+    links = {r["google_task_id"]: dict(r) for r in await con.fetch(
+        "SELECT * FROM task_links WHERE owner_id = $1 AND active AND google_task_id IS NOT NULL", user_id)}
+    out = {"status": "ok", "done": 0, "rescheduled": 0, "removed": 0}
+    for t in tasks:
+        link = links.get(t.get("id"))
+        if link is None:
+            continue
+        et, eid = link["entity_type"], link["entity_id"]
+        if t.get("deleted"):
+            await con.execute("UPDATE task_links SET active = false, sync_status = 'removed', sync_error = 'Deleted in Google Tasks', updated_at = now() WHERE id = $1", link["id"])
+            await _log(con, link["id"], user_id, "pulled", True, "Deleted in Google Tasks: no longer synced until the action changes.")
+            out["removed"] += 1
+            continue
+        if t.get("status") == "completed":
+            if not link["completed_in_google_at"]:
+                await con.execute("UPDATE task_links SET completed_in_google_at = now(), updated_at = now() WHERE id = $1", link["id"])
+                await con.execute("INSERT INTO activities(entity_type, entity_id, kind, summary, created_by) VALUES ($1, $2, 'action_done', $3, $4)",
+                                  et, eid, f"Marked done in Google Tasks: {link['title']}. Set the next action in the CRM.", user_id)
+                out["done"] += 1
+            continue
+        if link["completed_in_google_at"]:   # unticked again in Google
+            await con.execute("UPDATE task_links SET completed_in_google_at = NULL WHERE id = $1", link["id"])
+        due = t.get("due")
+        new_due = _date.fromisoformat(due[:10]) if due else None
+        if new_due and new_due != link["due"]:
+            rec = await con.fetchrow(f"SELECT * FROM {_TABLE[et]} WHERE id = $1", eid)
+            if rec is None:
+                continue
+            field = "nurture_until" if et == "opportunity" and rec["on_nurture"] else "next_action_due"
+            old = rec[field]
+            async with con.transaction():
+                await con.execute(f"UPDATE {_TABLE[et]} SET {field} = $2, updated_at = now() WHERE id = $1", eid, new_due)
+                await con.execute("UPDATE task_links SET due = $2, updated_at = now() WHERE id = $1", link["id"], new_due)
+                await con.execute("INSERT INTO record_history(entity_type, entity_id, field, old_value, new_value, changed_by) VALUES ($1, $2, $3, $4, $5, $6)",
+                                  et, eid, field, old.isoformat() if old else None, new_due.isoformat(), user_id)
+                await con.execute("INSERT INTO activities(entity_type, entity_id, kind, summary, created_by) VALUES ($1, $2, 'rescheduled', $3, $4)",
+                                  et, eid, f"Rescheduled in Google Tasks: {old.isoformat() if old else '—'} → {new_due.isoformat()}.", user_id)
+            from . import followups
+            await followups.reconcile(request, con, et, eid)   # move the Calendar follow-up too
+            out["rescheduled"] += 1
+    await con.execute("UPDATE calendar_connections SET tasks_pulled_at = $2 WHERE user_id = $1", user_id, now)
+    return out
+
+
+async def pull_all(request: Request, con: asyncpg.Connection, google: gc.Google, settings: Settings) -> dict:
+    total = {"users": 0, "done": 0, "rescheduled": 0, "removed": 0}
+    for r in await con.fetch("SELECT c.user_id FROM calendar_connections c JOIN users u ON u.id = c.user_id "
+                             "WHERE c.tasks_enabled AND c.status = 'connected' AND u.active"):
+        res = await pull_user(request, con, google, settings, r["user_id"], force=True)
+        total["users"] += 1
+        for k in ("done", "rescheduled", "removed"):
+            total[k] += res.get(k, 0)
+    return total
 
 
 async def backfill(request: Request, user_id: UUID) -> None:

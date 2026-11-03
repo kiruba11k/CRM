@@ -58,11 +58,14 @@ function TasksBar() {
       <div className={`banner banner-${s.enabled ? 'ok' : 'warn'}`} role="status">
         <div>
           {s.enabled
-            ? <>Google Tasks on: {n.synced || 0} next action{(n.synced || 0) === 1 ? '' : 's'} in your “LeadStrategus CRM” list{attention ? ` · ${attention} need a retry (on the record)` : ''}. One-way: ticking or editing a task in Google doesn’t change the CRM.</>
-            : <>Optional: mirror your open next actions into Google Tasks as personal to-dos. One-way, so the CRM stays the source of truth.</>}
+            ? <>Google Tasks on: {n.synced || 0} next action{(n.synced || 0) === 1 ? '' : 's'} in your “LeadStrategus CRM” list{attention ? ` · ${attention} need a retry (on the record)` : ''}. Tick a task off or change its date in Google and the CRM follows; the action itself is set in the CRM.</>
+            : <>Optional: your open next actions as Google Tasks to-dos. Tick one off or change its date in Google and the CRM follows.</>}
         </div>
         {s.enabled
-          ? <button type="button" className="btn" disabled={busy} onClick={() => { if (window.confirm('Turn off Google Tasks? This removes the “LeadStrategus CRM” list from your Google Tasks.')) run('/tasks/disable') }}>Turn off</button>
+          ? <span className="row" style={{ gap: 8 }}>
+              <button type="button" className="btn" disabled={busy} onClick={() => run('/tasks/pull?force=true')}>Sync now</button>
+              <button type="button" className="btn" disabled={busy} onClick={() => { if (window.confirm('Turn off Google Tasks? This removes the “LeadStrategus CRM” list from your Google Tasks.')) run('/tasks/disable') }}>Turn off</button>
+            </span>
           : <button type="button" className="btn btn-dark" disabled={busy} onClick={() => run('/tasks/enable')}>Turn on Google Tasks</button>}
       </div>
     </>

@@ -225,6 +225,20 @@ class Google:
             if e.status not in (404, 410):
                 raise
 
+    async def list_tasks(self, refresh_token: str, tasklist_id: str, updated_min: Optional[str] = None) -> list[dict]:
+        """Every task in the list changed since `updated_min` (RFC 3339),
+        including completed, hidden and deleted ones."""
+        params: dict = {"showCompleted": "true", "showHidden": "true", "showDeleted": "true", "maxResults": 100}
+        if updated_min:
+            params["updatedMin"] = updated_min
+        out: list[dict] = []
+        while True:
+            data = await self._call(refresh_token, "GET", self._tasks(tasklist_id), params=params) or {}
+            out += data.get("items", [])
+            if not data.get("nextPageToken"):
+                return out
+            params["pageToken"] = data["nextPageToken"]
+
     async def find_task(self, refresh_token: str, tasklist_id: str, marker: str) -> Optional[dict]:
         """A task in the CRM's list whose notes carry `marker`: lets a retried
         create adopt the task an earlier, unanswered attempt made."""

@@ -110,13 +110,13 @@ export type ActionKind = 'prospect' | 'opportunity' | 'nurture'
 export interface ActionItem {
   kind: ActionKind; id: string; title: string; account_name: string | null; owner_id: string | null; owner_name: string | null
   code: string | null; other: string | null; due: string; nurture_reason: string | null; label: string
-  days_until?: number | null; business_days_overdue?: number; escalated?: boolean; due_next_business_day?: boolean
+  days_until?: number | null; business_days_overdue?: number; escalated?: boolean; due_next_business_day?: boolean; done_in_google?: boolean
   due_time: string | null; in_calendar: boolean
 }
 export interface ActionsResponse {
   as_of: string; scope: 'me' | 'team'
-  counts: { overdue: number; today: number; upcoming: number; nurture: number; next_7_days: number; escalated: number; due_next_business_day: number }
-  overdue: ActionItem[]; today: ActionItem[]; upcoming: ActionItem[]; nurture: ActionItem[]
+  counts: { done_in_google: number; overdue: number; today: number; upcoming: number; nurture: number; next_7_days: number; escalated: number; due_next_business_day: number }
+  done_in_google: ActionItem[]; overdue: ActionItem[]; today: ActionItem[]; upcoming: ActionItem[]; nurture: ActionItem[]
 }
 
 export type CurrencyTotals = Record<string, number>

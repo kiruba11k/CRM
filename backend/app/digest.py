@@ -59,7 +59,7 @@ async def build(con: asyncpg.Connection, user: dict, today: date, app_url: str) 
         for i in team["overdue"]:
             team_over[i["owner_name"] or "Unassigned"] = team_over.get(i["owner_name"] or "Unassigned", 0) + 1
 
-    worth = bool(mine["overdue"] or mine["today"] or soon or quiet or revisits or (manager and (team_over or team_quiet)))
+    worth = bool(mine["done_in_google"] or mine["overdue"] or mine["today"] or soon or quiet or revisits or (manager and (team_over or team_quiet)))
     parts = []
     if mine["overdue"]:
         parts.append(f"{len(mine['overdue'])} overdue")
@@ -79,6 +79,9 @@ async def build(con: asyncpg.Connection, user: dict, today: date, app_url: str) 
         return [(f"{i['label']}: {i['title']}", f"{i['account_name'] or ''} · {detail(i)}", link(i["kind"], i["id"]))
                 for i in items[:MAX_LINES]]
 
+    if mine["done_in_google"]:
+        sections.append((f"Done in Google Tasks: set the next action ({len(mine['done_in_google'])})", action_lines(
+            mine["done_in_google"], lambda i: "ticked off in Google")))
     if mine["overdue"]:
         sections.append((f"Overdue ({len(mine['overdue'])})", action_lines(
             mine["overdue"], lambda i: f"{i['business_days_overdue']} business day(s) late" + (" · escalated" if i.get("escalated") else ""))))

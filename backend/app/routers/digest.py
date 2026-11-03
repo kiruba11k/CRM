@@ -98,4 +98,6 @@ async def cron(request: Request, con: asyncpg.Connection = Depends(get_con), set
         from .. import gmailsync
         from .calendar import _google
         gmail = await gmailsync.sync_all(con, _google(request, settings), settings)
+        from .. import tasksync
+        await tasksync.pull_all(request, con, _google(request, settings), settings)
     return {**await digest.run(con, mailer, settings.app_url), "gmail": gmail}

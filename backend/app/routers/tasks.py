@@ -58,3 +58,13 @@ async def retry(link_id: UUID, request: Request, con: asyncpg.Connection = Depen
         raise HTTPException(403, "Only the task’s owner, a manager or an admin can retry it.")
     await tasksync.sync_link(con, _google(request, settings), settings, link_id, "retry" if link["active"] else "delete")
     return await con.fetchrow("SELECT id, title, due, sync_status, sync_error, synced_at, owner_id FROM task_links WHERE id = $1", link_id)
+
+
+@router.post("/pull")
+async def pull(request: Request, force: bool = False, con: asyncpg.Connection = Depends(get_con), settings: Settings = Depends(get_settings),
+               user: User = Depends(current_user)):
+    """Read back what changed in my Google Tasks (ticked off, re-dated, deleted).
+    My Actions calls this on load; it runs at most once a minute unless forced."""
+    if settings.calendar_missing:
+        return {"status": "off", "done": 0, "rescheduled": 0, "removed": 0}
+    return await tasksync.pull_user(request, con, _google(request, settings), settings, UUID(user.id), force=force)

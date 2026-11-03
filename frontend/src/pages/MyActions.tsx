@@ -1,7 +1,7 @@
 // §5.3 / §7 My Actions: overdue, today, upcoming, nurture revisits.
 // Completing an action asks for the next one; nurture revisits end in
 // reactivate, extend or mark lost.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, api } from '../api'
 import { fmtDate } from '../format'
@@ -134,6 +134,7 @@ function Section({ title, note, tone, items, team, onOpen, leaving }: {
             </div>
             {/* Always present, so every row keeps the same columns. */}
             <div className="flags">
+              {i.done_in_google && <span className="pill pill-teal">✓ Done in Google Tasks</span>}
               {i.escalated && <span className="pill pill-red">Escalated to manager</span>}
               {i.due_next_business_day && <span className="pill pill-amber">Due next business day</span>}
             </div>
@@ -164,6 +165,13 @@ export default function MyActions() {
   const mine = quota.data?.rows.find((r) => r.user_id === user.id)
   const quarterLines = (mine?.by_currency || []).filter((l) => l.target || Number(l.won))
   const manager = can(user, 'team_view')
+  // Pick up anything ticked off or re-dated in Google Tasks (at most once a minute).
+  useEffect(() => {
+    api<{ done: number; rescheduled: number; removed: number }>('/tasks/pull', { method: 'POST' })
+      .then((r) => { if (r.done || r.rescheduled || r.removed) { void reload(); setToast(`Updated from Google Tasks: ${[r.done && `${r.done} done`, r.rescheduled && `${r.rescheduled} rescheduled`, r.removed && `${r.removed} removed there`].filter(Boolean).join(', ')}.`) } })
+      .catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const open = (item: ActionItem, mode: Mode) => setPanel({ item, mode })
 
   return (
@@ -208,6 +216,8 @@ export default function MyActions() {
             setToast(msg)
             window.setTimeout(() => { setLeaving(null); void reload(); void stale.reload() }, 280)
           }} />}
+        {data.done_in_google.length > 0 && <Section title="Done in Google Tasks" note="Ticked off in Google: complete them here to set the next action"
+          tone={{ bg: 'var(--teal-soft)', fg: 'var(--teal-ink)' }} items={data.done_in_google} team={scope === 'team'} onOpen={open} leaving={leaving} />}
         <Section title="Overdue" note="Stays until completed, rescheduled or closed" tone={{ bg: 'var(--red-soft)', fg: 'var(--red-ink)' }} items={data.overdue} team={scope === 'team'} onOpen={open} leaving={leaving} />
         <Section title="Due today" note="Reminder on the due date" tone={{ bg: 'var(--amber-soft)', fg: 'var(--amber-ink)' }} items={data.today} team={scope === 'team'} onOpen={open} leaving={leaving} />
         {stale.data && <QuietDeals items={stale.data.items} team={scope === 'team'} staleDays={stale.data.stale_days} />}
