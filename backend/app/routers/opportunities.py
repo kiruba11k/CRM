@@ -6,7 +6,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .. import domain, followups, integrations, tasksync
+from .. import domain, followups, integrations, slack, tasksync
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
 from ..records import activities, get_or_404, history, insert, log_activity, raise_if_errors, record_changes, update
 from ..schemas import CompleteActionIn, NoteIn, OpportunityIn, OpportunityPatch, RevisitIn
@@ -103,6 +103,7 @@ async def create_opportunity(body: OpportunityIn, request: Request, con: asyncpg
     async with con.transaction():
         result = await create_opportunity_record(con, body.model_dump(), user)
     await integrations.after_save(request, con, "opportunity", result["id"])
+    slack.deal_event(request, None, result, user.name)
     return result
 
 
@@ -158,6 +159,7 @@ async def update_opportunity(
     async with con.transaction():
         result = await _apply_update(con, opp_id, before, patch, user)
     await integrations.after_save(request, con, "opportunity", opp_id)
+    slack.deal_event(request, before, result, user.name)
     return result
 
 
@@ -199,6 +201,7 @@ async def revisit_nurture(
     async with con.transaction():
         result = await _apply_update(con, opp_id, before, patch, user)
     await integrations.after_save(request, con, "opportunity", opp_id, completed=True)
+    slack.deal_event(request, before, result, user.name)
     return result
 
 

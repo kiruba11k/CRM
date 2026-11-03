@@ -718,3 +718,13 @@ main.main:has(.bulk-bar) { padding-bottom: 140px; }
 }
 @media (display-mode: standalone) { body { overscroll-behavior-y: none; } }
 @media (max-width: 720px) { .search-trigger kbd { display: none; } }
+/* Slack */
+.slack-steps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; color: var(--ink-soft); }
+.slack-channel { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.slack-channel.off { opacity: .65; }
+.slack-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.slack-name { font-weight: 800; font-size: 15px; }
+.slack-events { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.slack-events .check { min-height: 30px; }
+.slack-msg { color: var(--ink-soft); overflow-wrap: anywhere; }
+.field > .label { font-size: 13px; font-weight: 600; }
