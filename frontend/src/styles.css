@@ -537,3 +537,29 @@ td.acts-cell, th.acts-cell { text-align: right; white-space: nowrap; }
 .role-desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; max-width: 160px; }
 .roles-matrix .perm-col { position: sticky; left: 0; background: var(--surface); z-index: 1; }
 .roles-matrix thead .perm-col { background: inherit; }
+
+/* Profile menu (top of the rail) */
+.profile-btn { flex: none; border: 0; padding: 3px; margin-bottom: 4px; border-radius: 50%; background: none; cursor: pointer;
+  box-shadow: 0 0 0 2px transparent; transition: box-shadow var(--t-fast), transform var(--t-fast) var(--ease-out); }
+.profile-btn:hover { box-shadow: 0 0 0 2px var(--accent-soft); }
+.profile-btn.open, .profile-btn:focus-visible { box-shadow: 0 0 0 2px var(--accent); outline: none; }
+.profile-btn .avatar { font-size: 14px; }
+.profile-menu { position: fixed; z-index: 100; width: 264px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(15, 17, 35, .18); padding: 8px; display: flex; flex-direction: column; animation: profile-in 140ms var(--ease-out) both; }
+@keyframes profile-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+.profile-head { display: flex; gap: 10px; align-items: flex-start; padding: 8px 8px 10px; }
+.profile-head > div { display: flex; flex-direction: column; }
+.profile-name { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-email { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-sep { height: 1px; background: var(--line); margin: 4px 0; }
+.profile-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 0 10px; border: 0; border-radius: 10px;
+  background: none; color: var(--ink); font: inherit; font-weight: 600; font-size: 14px; text-decoration: none; cursor: pointer; text-align: left; }
+.profile-item svg { width: 18px; height: 18px; flex: none; color: var(--ink-soft); }
+.profile-item > span:first-of-type { flex: 1; }
+.profile-item:hover, .profile-item:focus-visible { background: var(--paper); outline: none; }
+.profile-item.danger, .profile-item.danger svg { color: var(--red-ink); }
+.switch { position: relative; width: 34px; height: 20px; border-radius: 999px; background: var(--line); flex: none !important; transition: background-color var(--t-fast); }
+.switch > span { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform var(--t-fast) var(--ease-out); }
+.switch.on { background: var(--accent); }
+.switch.on > span { transform: translateX(14px); }
+@media (max-width: 720px) { .profile-btn { margin: 0 6px 0 0; } }

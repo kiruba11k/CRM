@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
 import CommandPalette, { type PaletteCommand } from './components/CommandPalette'
-import { Avatar, useTheme } from './theme'
-import { DEV_USER } from './api'
+import { useTheme } from './theme'
 import { useSessionState } from './session'
 import { Banner } from './ui'
 import QuickCreate, { type QuickType } from './components/QuickCreate'
+import ProfileMenu from './components/ProfileMenu'
 import MyActions from './pages/MyActions'
 import Prospects from './pages/Prospects'
 import ProspectRecord from './pages/ProspectRecord'
@@ -112,7 +112,8 @@ export default function App() {
     <MotionConfig reducedMotion="user">
     <div className="shell">
       <nav className="rail" aria-label="Main">
-        <NavLink to="/" className="rail-brand" aria-label="LeadStrategus CRM home" title="LeadStrategus CRM">LS</NavLink>
+        <ProfileMenu user={user} theme={theme} onToggleTheme={toggleTheme} onSignOut={session.signOut} />
+        <span className="rail-sep" aria-hidden="true" />
         {NAV.map((group, gi) => (
           <div key={gi} style={{ display: 'contents' }}>
             {gi > 0 && <span className="rail-sep" aria-hidden="true" />}
@@ -124,15 +125,6 @@ export default function App() {
             ))}
           </div>
         ))}
-        <div className="rail-foot">
-          <button type="button" className="theme-toggle" onClick={toggleTheme} data-tip={theme === 'dark' ? 'Light mode' : 'Dark mode'} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
-            {theme === 'dark'
-              ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-              : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>}
-          </button>
-          <Avatar name={user.name} size={36} />
-          <button type="button" onClick={session.signOut}>Sign out</button>
-        </div>
       </nav>
       <main className="main">
         <div className="topbar">
@@ -140,7 +132,6 @@ export default function App() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
             <span>Search deals, people, pages…</span><kbd>Ctrl K</kbd>
           </button>
-          <span className="who"><Avatar name={user.name} size={32} /><span>{user.name}<span className="muted small" style={{ fontWeight: 600 }}> · {user.role_name || user.role}{DEV_USER ? ' (dev sign-in)' : ''}</span></span></span>
           <div className="row">
             {(['account', 'prospect'] as const).map((t) => (
               <button key={t} type="button" className="btn" onClick={() => setQuick(t)}>+ {t[0].toUpperCase() + t.slice(1)}</button>
