@@ -122,7 +122,7 @@ function Section({ title, note, tone, items, team, onOpen, leaving }: {
         const k = KIND[i.kind]
         return (
           <div className={`action-row${leaving === `${i.kind}-${i.id}` ? ' leaving' : ''}`} key={`${i.kind}-${i.id}`}>
-            <span className={`pill pill-${k.pill}`}>{k.label}</span>
+            <span className="kind"><span className={`pill pill-${k.pill}`}>{k.label}</span></span>
             <div className="who">
               <Link to={k.path + i.id} style={{ fontWeight: 600 }}>{i.title}</Link>
               <span className="muted small">{i.account_name || 'No account yet'}{i.nurture_reason ? ` · ${i.nurture_reason}` : ''}</span>
@@ -131,9 +131,12 @@ function Section({ title, note, tone, items, team, onOpen, leaving }: {
               <span style={{ fontWeight: 600 }}>{i.kind === 'nurture' ? 'Revisit: ' : ''}{i.label || '—'}</span>
               <span className="small" style={{ fontWeight: 600, color: tone.fg }}>{dueText(i)}{team ? ` · ${i.owner_name}` : ''}</span>
             </div>
-            {i.escalated && <span className="pill pill-red">Escalated to manager</span>}
-            {i.due_next_business_day && <span className="pill pill-amber">Due next business day</span>}
-            <div className="row">
+            {/* Always present, so every row keeps the same columns. */}
+            <div className="flags">
+              {i.escalated && <span className="pill pill-red">Escalated to manager</span>}
+              {i.due_next_business_day && <span className="pill pill-amber">Due next business day</span>}
+            </div>
+            <div className="acts">
               {i.kind === 'nurture'
                 ? <button type="button" className="btn btn-outline" onClick={() => onOpen(i, 'revisit')}>Revisit now</button>
                 : <>

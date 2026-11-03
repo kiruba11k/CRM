@@ -136,9 +136,24 @@ td .sub { font-size: 12px; color: var(--ink-soft); }
 .section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .section-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 12px 16px; }
 .section-head h2 { font-size: 15px; }
-.action-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--line-soft); }
-.action-row .who { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; }
-.action-row .what { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; }
+.action-row { display: grid; grid-template-columns: 112px minmax(0, 1fr) minmax(0, 1.25fr) 180px auto; gap: 16px; align-items: center;
+  padding: 12px 16px; border-top: 1px solid var(--line-soft); }
+.action-row .kind { display: flex; }
+.action-row .who, .action-row .what { min-width: 0; display: flex; flex-direction: column; }
+.action-row .who > *, .action-row .what > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.action-row .flags { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.action-row .acts { display: flex; gap: 8px; justify-content: flex-end; }
+.action-row.muted { display: block; }
+@media (max-width: 1180px) {
+  .action-row { grid-template-columns: 112px minmax(0, 1fr) minmax(0, 1fr); }
+  .action-row .flags:empty { display: none; }
+  .action-row .flags, .action-row .acts { grid-column: 2 / -1; justify-content: flex-start; flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 640px) {
+  .action-row { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .action-row .flags, .action-row .acts { grid-column: auto; }
+  .action-row .who > *, .action-row .what > * { white-space: normal; }
+}
 
 /* Kanban */
 .board-scroll { overflow-x: auto; padding-bottom: 8px; }
@@ -451,3 +466,7 @@ tr.row-link:hover td { background: var(--accent-soft); }
 }
 /* Let rail tooltips show outside the rail when the whole rail fits. */
 @media (min-width: 721px) and (min-height: 780px) { .rail { overflow: visible; } }
+
+/* The rail still scrolls on short windows, without a visible scrollbar. */
+.rail { scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }
