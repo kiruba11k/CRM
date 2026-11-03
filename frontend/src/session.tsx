@@ -3,13 +3,14 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { ApiError, api, hasToken, setToken, setUnauthorizedHandler } from './api'
 import type { Lists, Permission, User } from './types'
 
-type Status = 'loading' | 'ready' | 'signed-out'
+type Status = 'loading' | 'ready' | 'signed-out' | 'offline'
 interface SessionState { status: Status; user: User | null; lists: Lists | null; users: User[]; error: string }
 export interface Session extends SessionState {
   signIn: (idToken: string) => void
   signOut: () => void
   refreshUsers: () => Promise<void>
   refreshLists: () => Promise<void>
+  retry: () => void
 }
 // Screens only render once signed in, so they can rely on user/lists.
 export interface ReadySession extends Session { user: User; lists: Lists }
@@ -27,9 +28,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setState({ status: 'ready', user, lists, users, error: '' })
     } catch (e) {
       const err = e as ApiError
-      setState({ ...empty, error: err.status === 401 ? '' : err.message })
+      // No connection (or the server is unreachable) while signed in: keep the
+      // sign-in and wait, rather than showing the sign-in screen.
+      if (err.status === 0 && hasToken()) setState({ ...empty, status: 'offline', error: err.message })
+      else setState({ ...empty, error: err.status === 401 ? '' : err.message })
     }
   }, [])
+  const retry = useCallback(() => { if (hasToken()) void load() }, [load])
+  useEffect(() => {
+    if (state.status !== 'offline') return
+    window.addEventListener('online', retry)
+    const t = window.setInterval(() => { if (navigator.onLine) retry() }, 20000)
+    return () => { window.removeEventListener('online', retry); window.clearInterval(t) }
+  }, [state.status, retry])
 
   useEffect(() => {
     setUnauthorizedHandler(() => setState((s) => ({ ...s, status: 'signed-out', user: null })))
@@ -60,7 +71,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('focus', onFocus)
   }, [state.status, refreshLists])
 
-  return <SessionCtx.Provider value={{ ...state, signIn, signOut, refreshUsers, refreshLists }}>{children}</SessionCtx.Provider>
+  return <SessionCtx.Provider value={{ ...state, signIn, signOut, refreshUsers, refreshLists, retry }}>{children}</SessionCtx.Provider>
 }
 
 export function useSessionState(): Session {

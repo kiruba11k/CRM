@@ -7,6 +7,8 @@ import { useSessionState } from './session'
 import { Banner } from './ui'
 import QuickCreate, { type QuickType } from './components/QuickCreate'
 import ProfileMenu from './components/ProfileMenu'
+import MobileNav from './components/MobileNav'
+import AppNotices from './components/AppNotices'
 import MyActions from './pages/MyActions'
 import Prospects from './pages/Prospects'
 import ProspectRecord from './pages/ProspectRecord'
@@ -97,6 +99,15 @@ export default function App() {
   }, [])
 
   if (session.status === 'loading') return <div className="loading">Loading the CRM… (the server may take up to a minute to wake up)</div>
+  if (session.status === 'offline') return (
+    <div className="login">
+      <div className="card strong" role="status">
+        <div className="row" style={{ gap: 12 }}><img src="/icons/icon-192.png" alt="" width={44} height={44} style={{ borderRadius: 12 }} /><strong style={{ fontSize: 20 }}>You’re offline</strong></div>
+        <p className="muted" style={{ margin: 0 }}>{navigator.onLine ? 'The CRM server isn’t answering yet (it may be waking up).' : 'The CRM needs a connection to show live data.'} It reconnects by itself as soon as it can.</p>
+        <button type="button" className="btn btn-dark" style={{ alignSelf: 'flex-start' }} onClick={session.retry}>Try again</button>
+      </div>
+    </div>
+  )
   if (session.status !== 'ready' || !session.user) return <Login />
 
   const { user } = session
@@ -126,7 +137,9 @@ export default function App() {
           </div>
         ))}
       </nav>
+      <MobileNav main={NAV[0]} more={NAV.slice(1).flat()} user={user} theme={theme} onToggleTheme={toggleTheme} onSignOut={session.signOut} />
       <main className="main">
+        <AppNotices />
         <div className="topbar">
           <button type="button" className="search-trigger" onClick={() => setPalette(true)}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
@@ -134,7 +147,7 @@ export default function App() {
           </button>
           <div className="row">
             {(['account', 'prospect'] as const).map((t) => (
-              <button key={t} type="button" className="btn" onClick={() => setQuick(t)}>+ {t[0].toUpperCase() + t.slice(1)}</button>
+              <button key={t} type="button" className="btn topbar-extra" onClick={() => setQuick(t)}>+ {t[0].toUpperCase() + t.slice(1)}</button>
             ))}
             <button type="button" className="btn btn-primary" onClick={() => setQuick('opportunity')}>+ New deal</button>
           </div>

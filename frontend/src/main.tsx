@@ -5,6 +5,9 @@ import App from './App'
 import { SessionProvider } from './session'
 import { ToastProvider } from './components/Toast'
 import './styles.css'
+import { registerPwa } from './pwa'
+
+registerPwa()
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

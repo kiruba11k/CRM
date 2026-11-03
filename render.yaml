@@ -64,6 +64,13 @@ services:
       - path: /*
         name: X-Robots-Tag
         value: noindex, nofollow
+      # Installable app: the service worker must always be re-checked so new deploys arrive.
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /manifest.webmanifest
+        name: Content-Type
+        value: application/manifest+json
     routes:
       # Client-side routes (/pipeline, /opportunities/…) all load index.html.
       - type: rewrite

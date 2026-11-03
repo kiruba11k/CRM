@@ -6,11 +6,13 @@ import { Link } from 'react-router-dom'
 import { DEV_USER } from '../api'
 import { Avatar } from '../theme'
 import type { User } from '../types'
+import { InstallHelp, useInstall } from './InstallApp'
 
 export default function ProfileMenu({ user, theme, onToggleTheme, onSignOut }: {
   user: User; theme: 'light' | 'dark'; onToggleTheme: () => void; onSignOut: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const install = useInstall()
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
   const btn = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
@@ -61,6 +63,12 @@ export default function ProfileMenu({ user, theme, onToggleTheme, onSignOut }: {
             <span>Dark mode</span>
             <span className={`switch${dark ? ' on' : ''}`} aria-hidden="true"><span /></span>
           </button>
+          {install.show && (
+            <button type="button" role="menuitem" className="profile-item" onClick={() => { setOpen(false); void install.start() }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
+              <span>Install the app</span>
+            </button>
+          )}
           <Link to="/settings" role="menuitem" className="profile-item" onClick={() => setOpen(false)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>
             <span>Settings</span>
@@ -73,6 +81,7 @@ export default function ProfileMenu({ user, theme, onToggleTheme, onSignOut }: {
         </div>,
         document.body,
       )}
+      {install.help && <InstallHelp ios={install.ios} onClose={install.closeHelp} />}
     </>
   )
 }

@@ -681,3 +681,40 @@ main.main:has(.bulk-bar) { padding-bottom: 140px; }
 .attach-link .input { flex: 1 1 200px; min-height: 40px; }
 .icon-btn { flex: none; width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--ink-soft); font-size: 18px; line-height: 1; cursor: pointer; }
 .icon-btn:hover { background: var(--red-soft); color: var(--red-ink); }
+
+/* ── Installed app / phones ─────────────────────────────────────────── */
+.bottom-nav { display: none; }
+.app-notice { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-radius: 12px; font-size: 14px; font-weight: 600; }
+.app-notice.offline { background: var(--amber-soft); color: var(--amber-ink); }
+.app-notice.update { background: var(--accent-soft); color: var(--accent-ink); }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(15, 17, 35, .42); display: flex; align-items: flex-end; justify-content: center; animation: fade-in 160ms ease both; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+.sheet { width: min(560px, 100%); max-height: 86vh; overflow-y: auto; background: var(--surface); border-radius: 20px 20px 0 0; padding: 8px 16px calc(16px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 10px; box-shadow: 0 -12px 40px rgba(15, 17, 35, .25); animation: sheet-up 200ms var(--ease-out) both; }
+.sheet-grab { width: 40px; height: 5px; border-radius: 999px; background: var(--line); align-self: center; margin: 2px 0 4px; }
+.sheet-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sheet-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 78px; padding: 8px; border-radius: 14px;
+  background: var(--paper-row); border: 1px solid var(--line); color: var(--ink); text-decoration: none; font-size: 12px; font-weight: 700; text-align: center; }
+.sheet-tile svg { width: 22px; height: 22px; color: var(--accent); }
+.sheet-tile.active { border-color: var(--accent); background: var(--accent-soft); }
+.install-help { gap: 14px; }
+.install-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.45; }
+.install-glyph { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--paper); font-size: 13px; }
+@media (min-width: 721px) { .install-help { border-radius: 20px; margin-bottom: 10vh; } }
+
+@media (max-width: 720px) {
+  .rail { display: none !important; }
+  .bottom-nav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: var(--surface); border-top: 1px solid var(--line);
+    padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); gap: 4px; box-shadow: 0 -6px 20px rgba(15, 17, 35, .06); }
+  .bn-link { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; border: 0; border-radius: 12px;
+    background: none; color: #6B6F82; font: inherit; font-size: 11px; font-weight: 700; text-decoration: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .bn-link svg { width: 23px; height: 23px; }
+  .bn-link.active { color: var(--accent); background: var(--accent-soft); }
+  .main { padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: calc(88px + env(safe-area-inset-bottom)) !important; }
+  .topbar-extra { display: none; }
+  .topbar .search-trigger { flex: 1 1 100%; }
+  .bulk-dock { bottom: calc(76px + env(safe-area-inset-bottom)); }
+}
+@media (display-mode: standalone) { body { overscroll-behavior-y: none; } }
+@media (max-width: 720px) { .search-trigger kbd { display: none; } }
