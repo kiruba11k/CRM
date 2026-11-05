@@ -222,6 +222,13 @@ async def _move(con: asyncpg.Connection, entity: str, frm: UUID, to: UUID) -> di
     await run("history", "UPDATE record_history SET entity_id = $3 WHERE entity_type = $1 AND entity_id = $2")
     await run("tasks", "UPDATE task_links SET entity_id = $3 WHERE entity_type = $1 AND entity_id = $2")
     await run("files", "UPDATE attachments SET entity_id = $3 WHERE entity_type = $1 AND entity_id = $2")
+    # Custom property values the kept record lacks, and list memberships (ids are unique across tables).
+    await con.execute("UPDATE custom_values v SET record_id = $2 WHERE v.record_id = $1 AND NOT EXISTS "
+                      "(SELECT 1 FROM custom_values k WHERE k.record_id = $2 AND k.field_id = v.field_id)", frm, to)
+    await con.execute("DELETE FROM custom_values WHERE record_id = $1", frm)
+    await con.execute("UPDATE record_list_members m SET record_id = $2 WHERE m.record_id = $1 AND NOT EXISTS "
+                      "(SELECT 1 FROM record_list_members k WHERE k.record_id = $2 AND k.list_id = m.list_id)", frm, to)
+    await con.execute("DELETE FROM record_list_members WHERE record_id = $1", frm)
     return n
 
 

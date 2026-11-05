@@ -12,6 +12,7 @@ import { GmailCard } from '../components/Gmail'
 import Attachments from '../components/Attachments'
 import CompleteAction from '../components/CompleteAction'
 import DealContacts from '../components/DealContacts'
+import { CustomFieldsCard } from '../components/CustomFields'
 import { StagePill } from '../theme'
 import type { Account, AccountDetail, FormValue, FormValues, Issue, OpportunityDetail, Prospect } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, TextField, WarningsBanner, changedFields, useLoad, withCurrent } from '../ui'
@@ -206,6 +207,7 @@ export default function OpportunityRecord() {
               <TeamPicker label="Internal database-build team" value={teams.database_build_team} onChange={(v) => setTeams({ ...teams, database_build_team: v })} />
             </section>
           )}
+          <CustomFieldsCard entity="opportunities" recordId={id} canEdit={canEdit} />
         </div>
 
         <div className="col-main">

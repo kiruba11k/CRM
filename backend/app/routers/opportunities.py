@@ -6,7 +6,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .. import domain, followups, integrations, slack, tasksync
+from .. import automations, domain, followups, integrations, slack, tasksync
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
 from ..records import (activities, check_outcome, completed_summary, get_or_404, history, insert, log_activity, raise_if_errors,
                        record_changes, update)
@@ -67,6 +67,7 @@ async def create_opportunity_record(con: asyncpg.Connection, data: dict, user: U
     row = await insert(con, "opportunities", data)
     await _set_teams(con, row["id"], teams)
     await record_changes(con, "opportunity", row["id"], None, row, user.id)
+    row = await automations.run(con, "opportunity", None, row, user.id)
     return {**_with_derived(row), "warnings": warnings}
 
 
@@ -145,6 +146,7 @@ async def _apply_update(con: asyncpg.Connection, opp_id: UUID, before: dict, pat
     if before["on_nurture"] != row["on_nurture"]:
         summary = f"Put on nurture until {row['nurture_until']} ({row['nurture_reason']})" if row["on_nurture"] else "Taken off nurture"
         await log_activity(con, "opportunity", opp_id, "nurture", summary, user.id)
+    row = await automations.run(con, "opportunity", before, row, user.id)
     return {**_with_derived(row), "warnings": warnings}
 
 
@@ -191,7 +193,8 @@ async def complete_action(
     else:
         patch = body.model_dump(include={*domain.NEXT_ACTION_FIELDS, "next_action_in_calendar"})
     async with con.transaction():
-        await log_activity(con, "opportunity", opp_id, "action_completed", completed_summary(done, body.outcome, body.note), user.id, body.outcome)
+        await log_activity(con, "opportunity", opp_id, "action_completed", completed_summary(done, body.outcome, body.note), user.id, body.outcome,
+                           before["next_action_code"])
         result = await _apply_update(con, opp_id, before, patch, user)
     await integrations.after_save(request, con, "opportunity", opp_id, completed=True)
     if result["stage"] != before["stage"]:

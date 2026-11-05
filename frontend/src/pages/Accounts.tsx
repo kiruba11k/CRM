@@ -8,6 +8,7 @@ import { useSession } from '../session'
 import type { Account } from '../types'
 import { BulkBar, RowBox, SelectAllBox, useSelection } from '../components/Bulk'
 import SavedViews from '../components/SavedViews'
+import { showValue, useCustomColumns } from '../components/CustomFields'
 import { ListFilter } from '../components/RecordLists'
 import type { SortDir } from '../theme'
 import { ErrorBanner, SelectField, Tabs, TextField, useLoad } from '../ui'
@@ -34,9 +35,10 @@ export default function Accounts() {
   const [activity, setActivity] = useState<string | null>(null)
   const [listId, setListId] = useState<string | null>(null)
   const [listIds, setListIds] = useState<Set<string> | null>(null)
+  const custom = useCustomColumns('accounts')
   const cols = useColumns('companies', [
     { key: 'status', label: 'Status' }, { key: 'country', label: 'Geography' }, { key: 'owner', label: 'Owner' },
-    { key: 'prospects', label: 'Contacts' }, { key: 'open', label: 'Open deals' }, { key: 'won', label: 'Won' }, { key: 'last', label: 'Last activity' },
+    { key: 'prospects', label: 'Contacts' }, { key: 'open', label: 'Open deals' }, { key: 'won', label: 'Won' }, { key: 'last', label: 'Last activity' }, ...custom.defs,
   ])
   const [exportError, setExportError] = useState<ApiError | null>(null)
   const { data, error, loading, reload } = useLoad(() => api<Account[]>('/accounts'), [])
@@ -95,6 +97,7 @@ export default function Accounts() {
               {cols.has('open') && <SortTh label="Open deals" k="open" sort={sort} by={by} num />}
               {cols.has('won') && <SortTh label="Won" k="won" sort={sort} by={by} num />}
               {cols.has('last') && <SortTh label="Last activity" k="last" sort={sort} by={by} />}
+              {custom.fields.filter((cf) => cols.has(`cf_${cf.key}`)).map((cf) => <th key={cf.id}>{cf.label}</th>)}
             </tr></thead>
             <tbody>
               {sorted.map((a) => (
@@ -108,6 +111,7 @@ export default function Accounts() {
                   {cols.has('open') && <td className="num">{a.open_count}</td>}
                   {cols.has('won') && <td className="num">{a.won_count}</td>}
                   {cols.has('last') && <td className="muted">{a.last_activity ? fmtDate(a.last_activity) : '—'}</td>}
+                  {custom.fields.filter((cf) => cols.has(`cf_${cf.key}`)).map((cf) => <td key={cf.id} className="muted">{showValue(cf, custom.values[a.id]?.[cf.key])}</td>)}
                 </tr>
               ))}
             </tbody>

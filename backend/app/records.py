@@ -90,10 +90,10 @@ async def record_changes(
 
 
 async def log_activity(con: asyncpg.Connection, entity_type: str, entity_id: UUID, kind: str, summary: str, user_id: str,
-                       outcome: Optional[str] = None) -> None:
+                       outcome: Optional[str] = None, action_code: Optional[str] = None) -> None:
     await con.execute(
-        "INSERT INTO activities(entity_type, entity_id, kind, summary, created_by, outcome) VALUES ($1, $2, $3, $4, $5, $6)",
-        entity_type, entity_id, kind, summary, UUID(user_id), outcome,
+        "INSERT INTO activities(entity_type, entity_id, kind, summary, created_by, outcome, action_code) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        entity_type, entity_id, kind, summary, UUID(user_id), outcome, action_code,
     )
 
 

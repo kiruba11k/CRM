@@ -13,6 +13,7 @@ import { ColumnPicker, useColumns } from '../components/Columns'
 import DealsToggle from '../components/DealsToggle'
 import HealthPill from '../components/HealthPill'
 import SavedViews from '../components/SavedViews'
+import { showValue, useCustomColumns } from '../components/CustomFields'
 import { ListFilter } from '../components/RecordLists'
 import { ErrorBanner, SelectField, TextField, useLoad } from '../ui'
 
@@ -38,12 +39,13 @@ export default function Deals() {
   const [listId, setListId] = useState<string | null>(null)
   const [listIds, setListIds] = useState<Set<string> | null>(null)
   const today = todayIso()
+  const custom = useCustomColumns('opportunities', data.data)
   const cols = useColumns('deals', [
     { key: 'name', label: 'Deal', locked: true }, { key: 'company', label: 'Company' }, { key: 'stage', label: 'Stage' },
     { key: 'amount', label: 'Amount' }, { key: 'weighted', label: 'Weighted', default: false }, { key: 'close', label: 'Close date' },
     { key: 'owner', label: 'Owner' }, { key: 'next', label: 'Next action' }, { key: 'health', label: 'Health' }, { key: 'risk', label: 'Risk rating', default: false }, { key: 'category', label: 'Forecast category', default: false },
     { key: 'source', label: 'Source', default: false }, { key: 'service', label: 'Service line', default: false }, { key: 'industry', label: 'Industry', default: false },
-    { key: 'activity', label: 'Last activity', default: false },
+    { key: 'activity', label: 'Last activity', default: false }, ...custom.defs,
   ])
   const days = (d?: string | null) => (d ? (Date.now() - new Date(d).getTime()) / 86400000 : Infinity)
   const inClose = (o: Opportunity) => {
@@ -139,6 +141,7 @@ export default function Deals() {
               {cols.has('service') && <SortTh label="Service line" k="service" sort={sort} by={by} />}
               {cols.has('industry') && <SortTh label="Industry" k="industry" sort={sort} by={by} />}
               {cols.has('activity') && <SortTh label="Last activity" k="activity" sort={sort} by={by} />}
+              {custom.fields.filter((cf) => cols.has(`cf_${cf.key}`)).map((cf) => <th key={cf.id}>{cf.label}</th>)}
             </tr></thead>
             <tbody>{sorted.map((o) => {
               const late = !!o.next_action_due && o.next_action_due < today && !['Won', 'Lost'].includes(o.stage)
@@ -160,6 +163,7 @@ export default function Deals() {
                   {cols.has('service') && <td className="muted">{o.service_line || '—'}</td>}
                   {cols.has('industry') && <td className="muted">{o.industry || '—'}</td>}
                   {cols.has('activity') && <td className="muted">{o.last_activity ? fmtDate(o.last_activity) : 'None'}</td>}
+                  {custom.fields.filter((cf) => cols.has(`cf_${cf.key}`)).map((cf) => <td key={cf.id} className="muted">{showValue(cf, custom.values[o.id]?.[cf.key])}</td>)}
                 </tr>
               )
             })}</tbody>

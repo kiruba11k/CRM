@@ -7,6 +7,7 @@ import { ActivityCard, HistoryCard, QuickActions } from '../components/Timeline'
 import { FollowUpStatus, MeetingsCard, TaskStatus } from '../components/Meetings'
 import { GmailCard } from '../components/Gmail'
 import CompleteAction from '../components/CompleteAction'
+import { CustomFieldsCard } from '../components/CustomFields'
 import { LifecyclePill } from './Prospects'
 import { nextActionLabel } from '../format'
 import type { Account, FormValue, FormValues, Issue, Opportunity, ProspectDetail } from '../types'
@@ -135,6 +136,7 @@ export default function ProspectRecord() {
             </div>
             <TextField label="Notes" multiline value={form.notes} onChange={(v) => set('notes', v)} />
           </section>
+          <CustomFieldsCard entity="prospects" recordId={id} canEdit={canEdit} />
         </div>
         <div className="col-main">
           {canEdit && <QuickActions entityType="prospect" entityId={id} />}

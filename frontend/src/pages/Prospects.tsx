@@ -13,6 +13,7 @@ import type { Prospect } from '../types'
 import { BulkBar, RowBox, SelectAllBox, useSelection } from '../components/Bulk'
 import { ColumnPicker, useColumns } from '../components/Columns'
 import SavedViews from '../components/SavedViews'
+import { showValue, useCustomColumns } from '../components/CustomFields'
 import { ListFilter } from '../components/RecordLists'
 import type { SortDir } from '../theme'
 import { CountUp, ErrorBanner, SelectField, StatusPill, Tabs, TextField, useLoad } from '../ui'
@@ -51,11 +52,12 @@ export default function Prospects({ mode = 'contacts' }: { mode?: Mode }) {
   const [exportError, setExportError] = useState<ApiError | null>(null)
   const { data, error, loading, reload } = useLoad(() => api<Prospect[]>('/prospects', { params: { scope } }), [scope])
   const today = todayIso()
+  const custom = useCustomColumns('prospects', data)
   const cols = useColumns(mode, [
     { key: 'name', label: 'Name', locked: true }, { key: 'company', label: 'Company' }, { key: 'lifecycle', label: 'Lifecycle stage' },
     { key: 'status', label: 'Lead status', default: leads }, { key: 'email', label: 'Email', default: !leads }, { key: 'phone', label: 'Phone', default: false },
     { key: 'source', label: 'Source', default: leads }, { key: 'industry', label: 'Industry', default: false }, { key: 'geo', label: 'Country' },
-    { key: 'owner', label: 'Owner' }, { key: 'activity', label: 'Last activity', default: false }, { key: 'due', label: 'Next action · due' },
+    { key: 'owner', label: 'Owner' }, { key: 'activity', label: 'Last activity', default: false }, { key: 'due', label: 'Next action · due' }, ...custom.defs,
   ])
 
   const base = useMemo(() => (data || []).filter((p) => !leads || LEAD_STAGES.includes(p.lifecycle || 'Lead')), [data, leads])
@@ -159,6 +161,7 @@ export default function Prospects({ mode = 'contacts' }: { mode?: Mode }) {
               {cols.has('geo') && <SortTh label="Country" k="geo" sort={sort} by={by} />}
               {cols.has('owner') && <SortTh label="Owner" k="owner" sort={sort} by={by} />}
               {cols.has('activity') && <SortTh label="Last activity" k="activity" sort={sort} by={by} />}
+              {custom.fields.filter((cf) => cols.has(`cf_${cf.key}`)).map((cf) => <th key={cf.id}>{cf.label}</th>)}
               {cols.has('due') && <SortTh label="Next action · due" k="due" sort={sort} by={by} />}
             </tr></thead>
             <tbody>
@@ -179,6 +182,7 @@ export default function Prospects({ mode = 'contacts' }: { mode?: Mode }) {
                     {cols.has('geo') && <td className="muted">{p.geography || '—'}</td>}
                     {cols.has('owner') && <td className="muted">{p.owner_name ? <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}><Avatar name={p.owner_name} size={26} />{p.owner_name}</span> : '—'}</td>}
                     {cols.has('activity') && <td className="muted">{p.last_activity ? fmtDate(p.last_activity) : 'None'}</td>}
+                  {custom.fields.filter((cf) => cols.has(`cf_${cf.key}`)).map((cf) => <td key={cf.id} className="muted">{showValue(cf, custom.values[p.id]?.[cf.key])}</td>)}
                     {cols.has('due') && <td>
                       <div>{closed ? 'None (closed)' : nextActionLabel(lists, p.next_action_code, p.next_action_other)}</div>
                       <div className="sub" style={{ color: overdue ? 'var(--red-ink)' : undefined, fontWeight: overdue ? 700 : 400 }}>

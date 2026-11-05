@@ -5,7 +5,7 @@ from uuid import UUID
 import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .. import domain, followups, integrations, slack, tasksync
+from .. import automations, domain, followups, integrations, slack, tasksync
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
 from ..records import (activities, check_outcome, completed_summary, get_or_404, history, insert, log_activity, raise_if_errors,
                        record_changes, update)
@@ -71,6 +71,7 @@ async def create_prospect(body: ProspectIn, request: Request, con: asyncpg.Conne
     async with con.transaction():
         row = await _save_or_conflict(insert(con, "prospects", data))
         await record_changes(con, "prospect", row["id"], None, row, user.id)
+        row = await automations.run(con, "prospect", None, row, user.id)
     await integrations.after_save(request, con, "prospect", row["id"])
     return {**row, "warnings": warnings}
 
@@ -142,6 +143,7 @@ async def update_prospect(
         await record_changes(con, "prospect", prospect_id, before, row, user.id)
         if before["status"] != row["status"]:
             await log_activity(con, "prospect", prospect_id, "status_change", f"Status: {before['status']} → {row['status']}", user.id)
+        row = await automations.run(con, "prospect", before, row, user.id)
     await integrations.after_save(request, con, "prospect", prospect_id)
     return {**row, "warnings": warnings}
 
@@ -178,12 +180,14 @@ async def complete_action(
     raise_if_errors(errors)
     done = domain.next_action_label(before["next_action_code"], before["next_action_other"]) or "Action"
     async with con.transaction():
-        await log_activity(con, "prospect", prospect_id, "action_completed", completed_summary(done, body.outcome, body.note), user.id, body.outcome)
+        await log_activity(con, "prospect", prospect_id, "action_completed", completed_summary(done, body.outcome, body.note), user.id, body.outcome,
+                           before["next_action_code"])
         patch["last_activity_at"] = await con.fetchval("SELECT now()")
         row = await update(con, "prospects", prospect_id, patch)
         await record_changes(con, "prospect", prospect_id, before, row, user.id)
         if before["status"] != row["status"]:
             await log_activity(con, "prospect", prospect_id, "status_change", f"Status: {before['status']} → {row['status']}", user.id)
+        row = await automations.run(con, "prospect", before, row, user.id)
     await integrations.after_save(request, con, "prospect", prospect_id, completed=True)
     return row
 

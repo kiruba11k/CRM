@@ -11,6 +11,7 @@ interface OutcomesData {
   days: number; total: number
   outcomes: { code: string; label: string; count: number }[]
   by_owner: { name: string; counts: Record<string, number>; total: number }[]
+  by_action?: { code: string; label: string; counts: Record<string, number>; total: number; positive_rate: number }[]
 }
 
 export default function OutcomesReport() {
@@ -48,6 +49,25 @@ export default function OutcomesReport() {
             ))}</tbody>
           </table>
         </div>
+        {d.by_action && d.by_action.length > 0 && <>
+          <h3 style={{ margin: '6px 0 0' }}>Which follow-ups work</h3>
+          <span className="muted small">For each type of action completed, the share that ended Connected, Meeting booked or Proposal requested.</span>
+          <div className="table-wrap">
+            <table style={{ minWidth: 720 }}>
+              <thead><tr><th>Action type</th><th className="num">Completed</th><th>Led somewhere</th>{OUTCOMES.map((o) => <th key={o.code} className="num">{o.label}</th>)}</tr></thead>
+              <tbody>{d.by_action.map((a) => (
+                <tr key={a.code}>
+                  <td><strong style={{ whiteSpace: 'nowrap' }}>{a.label}</strong></td>
+                  <td className="num">{a.total}</td>
+                  <td><div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
+                    <div className="bar-track" style={{ width: 90 }}><div className="bar-fill" style={{ width: `${a.positive_rate}%`, background: 'var(--teal-ink, #0E7C6B)' }} /></div>
+                    <span className="small">{a.positive_rate}%</span></div></td>
+                  {OUTCOMES.map((o) => <td key={o.code} className="num">{a.counts[o.code] || 0}</td>)}
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </>}
       </>}
     </section>
   )

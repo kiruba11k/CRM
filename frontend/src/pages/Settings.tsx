@@ -1,6 +1,8 @@
 // §8 Settings: controlled lists and stage probabilities, reminders, users
 // & roles, Google integrations, export & backup, the shared launch
 // checklist (§9, §10) and a log of every settings change.
+import AutomationsSettings from '../components/AutomationsSettings'
+import CustomFieldsSettings from '../components/CustomFieldsSettings'
 import { useEffect, useState } from 'react'
 import { ApiError, api, downloadCsv } from '../api'
 import { fmtDateTime } from '../format'
@@ -10,7 +12,7 @@ import SlackSettings from '../components/SlackSettings'
 import type { CalendarStatus, ChecklistItem, DigestMe, DigestPreview, EditableList, ReminderSettings, SettingsChange, SettingsView } from '../types'
 import { Banner, ErrorBanner, Tabs, TextField, useLoad } from '../ui'
 
-type Tab = 'lists' | 'reminders' | 'roles' | 'integrations' | 'slack' | 'data' | 'launch' | 'log'
+type Tab = 'lists' | 'reminders' | 'properties' | 'automations' | 'roles' | 'integrations' | 'slack' | 'data' | 'launch' | 'log'
 type Tag = 'required' | 'confirm' | 'configurable'
 
 const TAG: Record<Tag, { label: string; pill: string }> = {
@@ -581,7 +583,7 @@ export default function Settings() {
         </div>
       </div>
       <Tabs<Tab> label="Settings sections" value={tab} onChange={setTab} tabs={[
-        { value: 'lists', label: 'Controlled lists' }, { value: 'reminders', label: 'Reminders' }, { value: 'roles', label: 'People & access' },
+        { value: 'lists', label: 'Controlled lists' }, { value: 'reminders', label: 'Reminders' }, { value: 'properties', label: 'Custom properties' }, { value: 'automations', label: 'Automations' }, { value: 'roles', label: 'People & access' },
         { value: 'integrations', label: 'Google integrations' }, { value: 'slack', label: 'Slack' }, { value: 'data', label: 'Export & backup' }, { value: 'launch', label: 'Launch checklist' },
         { value: 'log', label: 'Change log' },
       ]} />
@@ -589,6 +591,8 @@ export default function Settings() {
       {needsView && !current && !settings.error && <div className="loading" data-label="Loading settings…">Loading settings…</div>}
       {tab === 'lists' && current && <ListsTab view={current} onView={setView} />}
       {tab === 'reminders' && current && <RemindersTab view={current} onView={setView} />}
+      {tab === 'properties' && <CustomFieldsSettings />}
+      {tab === 'automations' && <AutomationsSettings />}
       {tab === 'roles' && <PeopleAccess />}
       {tab === 'slack' && <SlackSettings />}
       {tab === 'integrations' && <IntegrationsTab />}

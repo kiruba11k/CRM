@@ -12,6 +12,7 @@ import { ActivityCard, HistoryCard, QuickActions } from '../components/Timeline'
 import EmailContacts from '../components/EmailContacts'
 import Attachments from '../components/Attachments'
 import QuickCreate, { type QuickType } from '../components/QuickCreate'
+import { CustomFieldsCard } from '../components/CustomFields'
 import { Avatar, StagePill } from '../theme'
 import type { AccountDetail, FormValue, FormValues, Opportunity, Prospect } from '../types'
 import { Banner, ErrorBanner, OwnerField, SelectField, StatusPill, TextField, changedFields, useLoad, withCurrent } from '../ui'
@@ -161,6 +162,7 @@ export default function AccountRecord() {
             <TextField label="Notes" multiline value={form.notes} onChange={(v) => set('notes', v)} hint="Avoid storing unnecessary sensitive information" />
             {!canEdit && <span className="muted small">Read-only: only the owner, a manager or an admin can edit.</span>}
           </section>
+          <CustomFieldsCard entity="accounts" recordId={id} canEdit={canEdit} />
         </div>
 
         <div className="col-main">

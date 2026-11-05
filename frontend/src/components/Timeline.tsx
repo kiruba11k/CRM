@@ -15,7 +15,7 @@ const FILTERS: { key: string; label: string; kinds: string[] | null }[] = [
   { key: 'email', label: 'Emails', kinds: ['email'] },
   { key: 'meeting', label: 'Meetings', kinds: ['meeting'] },
   { key: 'actions', label: 'Actions', kinds: ['action_completed'] },
-  { key: 'changes', label: 'Changes', kinds: ['stage_change', 'status_change', 'nurture', 'contact', 'attachment', 'converted', 'merged'] },
+  { key: 'changes', label: 'Changes', kinds: ['stage_change', 'status_change', 'nurture', 'contact', 'attachment', 'converted', 'merged', 'automation'] },
 ]
 
 const FIELD_LABEL: Record<string, string> = {

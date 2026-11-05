@@ -132,8 +132,23 @@ async def outcomes(con: asyncpg.Connection, days: int = 90) -> dict:
     for r in rows:
         total[r["outcome"]] = total.get(r["outcome"], 0) + r["n"]
         by_owner[r["owner"]][r["outcome"]] += r["n"]
+    # Follow-up effectiveness: per action type, how often it led somewhere.
+    positive = ("connected", "meeting_booked", "proposal_requested")
+    by_action = []
+    for r in await con.fetch(
+            "SELECT a.action_code, a.outcome, count(*) AS n FROM activities a WHERE a.kind = 'action_completed' AND a.outcome IS NOT NULL "
+            "AND a.action_code IS NOT NULL AND a.occurred_at >= now() - make_interval(days => $1) GROUP BY 1, 2", days):
+        row = next((x for x in by_action if x["code"] == r["action_code"]), None)
+        if row is None:
+            row = {"code": r["action_code"], "label": domain.NEXT_ACTIONS.get(r["action_code"], r["action_code"]), "counts": {k: 0 for k in domain.OUTCOMES}, "total": 0}
+            by_action.append(row)
+        row["counts"][r["outcome"]] += r["n"]
+        row["total"] += r["n"]
+    for row in by_action:
+        row["positive_rate"] = round(100 * sum(row["counts"][k] for k in positive) / row["total"])
+    by_action.sort(key=lambda x: (-x["total"], x["code"]))
     return {
-        "days": days,
+        "days": days, "by_action": by_action,
         "outcomes": [{"code": k, "label": v, "count": total[k]} for k, v in domain.OUTCOMES.items()],
         "total": sum(total.values()),
         "by_owner": sorted(({"name": k, "counts": v, "total": sum(v.values())} for k, v in by_owner.items()), key=lambda x: -x["total"]),
