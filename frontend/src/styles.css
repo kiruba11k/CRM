@@ -805,3 +805,9 @@ a.tile-link:hover { border-color: var(--accent); transform: translateY(-1px); }
 .assoc-details dt { color: var(--ink-soft); }
 .assoc-details dd { margin: 0; overflow-wrap: anywhere; }
 .tiles-compact { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.lifecycle-help { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.lifecycle-help summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.lifecycle-help dl { display: grid; gap: 6px; margin: 10px 0; }
+.lifecycle-help dl > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.lifecycle-help dd { margin: 0; font-size: 14px; }
+@media (max-width: 560px) { .lifecycle-help dl > div { grid-template-columns: 1fr; gap: 2px; } }

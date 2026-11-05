@@ -28,6 +28,15 @@ const EMPTY: Filters = { lifecycle: null, status: null, owner: null, country: nu
 const DEFAULT_VIEW: ViewState = { scope: 'all', ...EMPTY, sort_key: 'due', sort_dir: 'asc' }
 const ACTIVITY = [{ value: '7', label: 'Active in the last 7 days' }, { value: '30', label: 'Active in the last 30 days' }, { value: 'quiet30', label: 'No activity for 30+ days' }, { value: 'never', label: 'No activity logged' }]
 
+const LIFECYCLE_HELP: [string, string][] = [
+  ['Lead', 'A person we may sell to, not yet qualified (status New, Contacted or Engaged).'],
+  ['Qualified lead', 'Confirmed fit and interest (status Qualified). Next step: create a deal when there is a specific piece of business.'],
+  ['Opportunity', 'Contact on at least one open deal, as the primary contact or another buying contact.'],
+  ['Customer', 'Contact on a won deal.'],
+  ['Nurture', 'Not now, but later: waits in the Nurture revisits queue on My Actions until the revisit date.'],
+  ['Disqualified', 'Not a fit or not interested. No reminders.'],
+]
+
 export function LifecyclePill({ value }: { value?: string | null }) {
   return value ? <span className={`pill pill-${LIFECYCLE_PILL[value] || 'grey'}`}>{value}</span> : null
 }
@@ -86,6 +95,13 @@ export default function Prospects({ mode = 'contacts' }: { mode?: Mode }) {
           <button type="button" className="btn" onClick={() => downloadCsv('prospects').catch((e: ApiError) => setExportError(e))}>Export CSV</button>
         </div>
       </div>
+      <details className="lifecycle-help">
+        <summary>How lifecycle stages work</summary>
+        <dl>
+          {LIFECYCLE_HELP.map(([k, v]) => <div key={k}><dt><LifecyclePill value={k} /></dt><dd>{v}</dd></div>)}
+        </dl>
+        <p className="muted small" style={{ margin: 0 }}>The stage is worked out from the contact’s status and their deals, so it is always current. One person has one record: merge duplicates under Data management.</p>
+      </details>
       <ErrorBanner error={exportError} onClose={() => setExportError(null)} />
 
       <section className="tiles" aria-label={leads ? 'Lead status' : 'Lifecycle stages'}>

@@ -121,6 +121,8 @@ export interface ActionItem {
   code: string | null; other: string | null; due: string; nurture_reason: string | null; label: string
   days_until?: number | null; business_days_overdue?: number; escalated?: boolean; due_next_business_day?: boolean; done_in_google?: boolean
   due_time: string | null; in_calendar: boolean
+  /** A contact in status Nurture, waiting for its revisit date. */
+  paused?: boolean
 }
 export interface ActionsResponse {
   as_of: string; scope: 'me' | 'team'

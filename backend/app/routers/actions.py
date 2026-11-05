@@ -12,22 +12,24 @@ from ..auth import User, current_user, get_con
 router = APIRouter(prefix="/actions", tags=["actions"])
 
 # Active prospects, open non-nurtured opportunities, and nurture revisits.
+# `paused`: a contact in status Nurture waits in the nurture queue until its
+# next action falls due, then shows as a normal action again.
 _SQL = """
 SELECT 'prospect' AS kind, p.id, p.full_name AS title, a.name AS account_name, p.owner_id, u.name AS owner_name,
        p.next_action_code AS code, p.next_action_other AS other, p.next_action_due AS due, NULL::text AS nurture_reason,
-       p.next_action_time AS due_time, p.next_action_in_calendar AS in_calendar
+       p.next_action_time AS due_time, p.next_action_in_calendar AS in_calendar, p.status = 'Nurture' AS paused
 FROM prospects p LEFT JOIN accounts a ON a.id = p.account_id LEFT JOIN users u ON u.id = p.owner_id
 WHERE p.status <> 'Disqualified' AND p.next_action_due IS NOT NULL AND ($1::uuid IS NULL OR p.owner_id = $1)
 UNION ALL
 SELECT 'opportunity', o.id, o.name, a.name, o.owner_id, u.name,
        o.next_action_code, o.next_action_other, o.next_action_due, NULL,
-       o.next_action_time, o.next_action_in_calendar
+       o.next_action_time, o.next_action_in_calendar, false
 FROM opportunities o JOIN accounts a ON a.id = o.account_id LEFT JOIN users u ON u.id = o.owner_id
 WHERE o.stage NOT IN ('Won', 'Lost') AND NOT o.on_nurture AND o.next_action_due IS NOT NULL AND ($1::uuid IS NULL OR o.owner_id = $1)
 UNION ALL
 SELECT 'nurture', o.id, o.name, a.name, COALESCE(o.nurture_owner_id, o.owner_id), u.name,
        o.nurture_next_action_code, o.nurture_next_action_other, o.nurture_until, o.nurture_reason,
-       NULL::time, false
+       NULL::time, false, true
 FROM opportunities o JOIN accounts a ON a.id = o.account_id LEFT JOIN users u ON u.id = COALESCE(o.nurture_owner_id, o.owner_id)
 WHERE o.on_nurture AND o.stage NOT IN ('Won', 'Lost') AND ($1::uuid IS NULL OR COALESCE(o.nurture_owner_id, o.owner_id) = $1)
 ORDER BY due, due_time NULLS LAST
@@ -62,7 +64,8 @@ async def collect(con: asyncpg.Connection, owner: Optional[UUID], today: date) -
             if item["kind"] != "nurture" and due < today:
                 item["business_days_overdue"] = domain.business_days_between(due, today)
             sections["done_in_google"].append(item)
-        elif item["kind"] == "nurture":
+        elif item["kind"] == "nurture" or (item["paused"] and due > today):
+            # Deals on nurture, and contacts set to Nurture until their revisit (next action) date.
             item["days_until"] = (due - today).days if due else None
             sections["nurture"].append(item)
         elif due < today:

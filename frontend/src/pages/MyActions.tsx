@@ -16,8 +16,8 @@ type Outcome = 'reactivate' | 'extend' | 'lost'
 type Scope = 'me' | 'team'
 
 const KIND: Record<ActionKind, { label: string; pill: string; path: string }> = {
-  prospect: { label: 'Prospect', pill: 'blue', path: '/contacts/' },
-  opportunity: { label: 'Opportunity', pill: 'teal', path: '/opportunities/' },
+  prospect: { label: 'Contact', pill: 'blue', path: '/contacts/' },
+  opportunity: { label: 'Deal', pill: 'teal', path: '/opportunities/' },
   nurture: { label: 'Nurture revisit', pill: 'purple', path: '/opportunities/' },
 }
 
@@ -111,7 +111,7 @@ function dueText(i: ActionItem): string {
 }
 
 function baseDueText(i: ActionItem, at: string): string {
-  if (i.kind === 'nurture') return `Revisit ${fmtDate(i.due)}${i.days_until != null ? ` · in ${plural(i.days_until, 'day')}` : ''}`
+  if (i.kind === 'nurture' || i.paused) return `Revisit ${fmtDate(i.due)}${i.days_until != null ? ` · in ${plural(i.days_until, 'day')}` : ''}`
   if (i.business_days_overdue !== undefined) return `Due ${fmtDate(i.due)}${at} · ${plural(i.business_days_overdue, 'business day')} overdue`
   if (i.days_until != null) return `Due ${fmtDate(i.due)}${at} · in ${plural(i.days_until, 'day')}`
   return `Due today${at}`
@@ -138,7 +138,7 @@ function Section({ title, note, tone, items, team, onOpen, leaving }: {
               <span className="muted small">{i.account_name || 'No account yet'}{i.nurture_reason ? ` · ${i.nurture_reason}` : ''}</span>
             </div>
             <div className="what">
-              <span style={{ fontWeight: 600 }}>{i.kind === 'nurture' ? 'Revisit: ' : ''}{i.label || '—'}</span>
+              <span style={{ fontWeight: 600 }}>{i.kind === 'nurture' || i.paused ? 'Revisit: ' : ''}{i.label || '—'}</span>
               <span className="small" style={{ fontWeight: 600, color: tone.fg }}>{dueText(i)}{team ? ` · ${i.owner_name}` : ''}</span>
             </div>
             {/* Always present, so every row keeps the same columns. */}
@@ -231,7 +231,7 @@ export default function MyActions() {
         <Section title="Due today" note="Reminder on the due date" tone={{ bg: 'var(--amber-soft)', fg: 'var(--amber-ink)' }} items={data.today} team={scope === 'team'} onOpen={open} leaving={leaving} />
         {stale.data && <QuietDeals items={stale.data.items} team={scope === 'team'} staleDays={stale.data.stale_days} />}
         <Section title="Upcoming actions" note="Next actions after today" tone={{ bg: 'var(--paper-row)', fg: 'var(--ink)' }} items={data.upcoming} team={scope === 'team'} onOpen={open} leaving={leaving} />
-        <Section title="Nurture revisits" note="Routine reminders paused; one reminder on the revisit date" tone={{ bg: 'var(--purple-soft)', fg: 'var(--purple-ink)' }} items={data.nurture} team={scope === 'team'} onOpen={open} leaving={leaving} />
+        <Section title="Nurture revisits" note="Deals on nurture and contacts set to Nurture: one reminder on the revisit date, kept out of the active forecast" tone={{ bg: 'var(--purple-soft)', fg: 'var(--purple-ink)' }} items={data.nurture} team={scope === 'team'} onOpen={open} leaving={leaving} />
       </>}
     </>
   )

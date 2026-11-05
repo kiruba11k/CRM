@@ -59,3 +59,17 @@ def test_contact_duplicates(client):
     assert len(client.get("/api/prospects/duplicates", params={"name": "elin  berg"}).json()) == 1
     assert client.get("/api/prospects/duplicates", params={"name": "eli"}).json() == []
     assert REP
+
+
+def test_nurture_contacts_wait_in_nurture_queue(client):
+    from datetime import date, timedelta
+    later = (date.today() + timedelta(days=60)).isoformat()
+    p = client.post("/api/prospects", {"full_name": "Paused Person", "email": "p@x.se", "status": "Nurture",
+                                       "next_action_code": "16", "next_action_due": later}).json()
+    a = client.get("/api/actions").json()
+    assert [i["id"] for i in a["nurture"]] == [p["id"]] and a["nurture"][0]["paused"] and a["nurture"][0]["days_until"] == 60
+    assert p["id"] not in [i["id"] for i in a["upcoming"]]
+    # When the revisit date comes it is a normal action again.
+    client.patch(f"/api/prospects/{p['id']}", {"next_action_due": date.today().isoformat()})
+    a = client.get("/api/actions").json()
+    assert p["id"] in [i["id"] for i in a["today"]] and a["nurture"] == []
