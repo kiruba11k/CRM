@@ -15,6 +15,7 @@ interface HomeData {
   at_risk: number; no_next_action: number
   team: { name: string; open: number; pipeline: CurrencyTotals; overdue: number; no_action: number; at_risk: number; activities_7d: number; won_quarter: CurrencyTotals }[]
   conversion: { stage: string; next: string; reached: number; went_on: number; rate: number | null }[]
+  stages: { stage: string; open: number; avg_days: number | null; stalled: number }[]; stalled_days: number
 }
 const num = (o: CurrencyTotals) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, Number(v)]))
 
@@ -49,6 +50,21 @@ export default function Home() {
               </div>
             ))}
             <span className="muted small">Of the deals that reached a stage, the share that moved further. Hover a row for the counts.</span>
+          </section>
+          <section className="card col-side" aria-label="Time in stage">
+            <div className="card-head"><h2>Where deals are stuck</h2><span className="muted small">open deals · stalled = {h.stalled_days}+ days in a stage</span></div>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Stage</th><th className="num">Open</th><th className="num">Avg days in stage</th><th className="num">Stalled</th></tr></thead>
+                <tbody>{h.stages.map((s) => (
+                  <tr key={s.stage}>
+                    <td><span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}><span className="dot" style={{ background: stageColor(s.stage) }} aria-hidden="true" />{s.stage}</span></td>
+                    <td className="num">{s.open}</td><td className="num">{s.avg_days ?? '—'}</td>
+                    <td className="num" style={{ color: s.stalled ? 'var(--red-ink)' : undefined }}>{s.stalled ? <Link to={`/deals?health=risk`}>{s.stalled}</Link> : 0}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
           </section>
           <section className="card col-main" aria-label="Team">
             <div className="card-head"><h2>Team activity and performance</h2><Link to="/reports" className="small">Reports</Link></div>

@@ -107,7 +107,6 @@ export default function ProspectRecord() {
           {data.lifecycle && <LifecyclePill value={data.lifecycle} />}
         </div>
         <div className="row">
-          {canEdit && !closed && <button type="button" className="btn btn-outline" onClick={() => setConverting(true)}>Create deal</button>}
           {canEdit && <button type="button" className="btn btn-primary" onClick={save}>Save</button>}
         </div>
       </div>

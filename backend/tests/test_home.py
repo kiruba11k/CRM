@@ -19,6 +19,8 @@ def test_home_and_conversion(client):
     assert h["win_rate"] == {"won": 1, "lost": 0, "rate": 100}
     rep = next(t for t in h["team"] if t["name"] == "rep")
     assert rep["open"] == 1 and float(rep["won_quarter"]["USD"]) == 19000
+    st = {s["stage"]: s for s in h["stages"]}
+    assert st["Qualified"]["open"] == 1 and st["Qualified"]["avg_days"] == 0 and st["Qualified"]["stalled"] == 0 and h["stalled_days"] == 45
     conv = {c["stage"]: c for c in h["conversion"]}
     assert conv["Qualified"]["reached"] == 2 and conv["Negotiation"]["reached"] == 1 and conv["Negotiation"]["went_on"] == 1
 

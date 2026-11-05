@@ -96,8 +96,21 @@ async def overview(con: asyncpg.Connection, today: Optional[date] = None) -> dic
     for u in await con.fetch("SELECT u.name FROM users u JOIN roles r ON r.key = u.role WHERE u.active AND NOT ('team_view' = ANY(r.permissions))"):
         team[u["name"]]  # salespeople show even with nothing yet
 
+    # Where open deals sit: per stage, how many, average days in the stage, how many past the stalled limit.
+    stalled_days = int(domain.REMINDERS.get("stalled_days") or 45)
+    stuck = {s: {"stage": s, "open": 0, "days": 0, "stalled": 0} for s in OPEN_STAGE_NAMES}
+    for r in await con.fetch(
+            "SELECT o.stage, (now()::date - coalesce((SELECT max(h.changed_at) FROM record_history h WHERE h.entity_type = 'opportunity' "
+            "AND h.entity_id = o.id AND h.field = 'stage'), o.created_at)::date) AS days "
+            "FROM opportunities o WHERE o.stage NOT IN ('Won','Lost') AND NOT o.on_nurture"):
+        if r["stage"] in stuck:
+            row = stuck[r["stage"]]
+            row["open"] += 1; row["days"] += r["days"]; row["stalled"] += r["days"] >= stalled_days
+    stages = [{**v, "avg_days": round(v["days"] / v["open"]) if v["open"] else None} for v in stuck.values()]
+
     return {
         "as_of": today,
+        "stages": stages, "stalled_days": stalled_days,
         "open_deals": len(open_), "pipeline": pipeline, "weighted": weighted,
         "closing_this_month": {"count": closing_n, "value": closing},
         "new_leads": {"week": leads_week, "month": leads_month},
