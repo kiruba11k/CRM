@@ -100,7 +100,7 @@ export default function OpportunityRecord() {
 
   return (
     <>
-      <div className="muted small"><Link to="/pipeline">Pipeline</Link> / {account ? <Link to={`/accounts/${account.id}`}>{account.name}</Link> : 'Account'}</div>
+      <div className="muted small"><Link to="/pipeline">Pipeline</Link> / {account ? <Link to={`/companies/${account.id}`}>{account.name}</Link> : 'Account'}</div>
       <div className="page-head">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <h1>{data.name}</h1>
@@ -220,7 +220,7 @@ export default function OpportunityRecord() {
             <h2>Contacts at {account?.name || 'this account'}</h2>
             {contacts.length === 0 && <p className="muted small" style={{ margin: 0 }}>No prospects linked to this account yet.</p>}
             {contacts.map((p) => (
-              <Link key={p.id} to={`/prospects/${p.id}`} className="deal-card">
+              <Link key={p.id} to={`/contacts/${p.id}`} className="deal-card">
                 <span className="title">{p.full_name}{p.id === data.primary_contact_id ? ' · primary' : ''}</span>
                 <span className="small muted">{p.job_title || p.status}</span>
               </Link>

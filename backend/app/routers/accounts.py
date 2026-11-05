@@ -16,7 +16,8 @@ _LIST_SQL = """
 SELECT a.*, u.name AS owner_name,
        (SELECT count(*) FROM prospects p WHERE p.account_id = a.id) AS prospect_count,
        (SELECT count(*) FROM opportunities o WHERE o.account_id = a.id AND o.stage NOT IN ('Won','Lost') AND NOT o.on_nurture) AS open_count,
-       (SELECT count(*) FROM opportunities o WHERE o.account_id = a.id AND o.stage = 'Won') AS won_count
+       (SELECT count(*) FROM opportunities o WHERE o.account_id = a.id AND o.stage = 'Won') AS won_count,
+       (SELECT max(x.occurred_at) FROM activities x WHERE x.entity_type = 'account' AND x.entity_id = a.id) AS last_activity
 FROM accounts a LEFT JOIN users u ON u.id = a.owner_id
 WHERE ($1::text IS NULL OR a.status = $1)
   AND ($2::text IS NULL OR a.country = $2)

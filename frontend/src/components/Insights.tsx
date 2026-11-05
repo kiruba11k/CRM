@@ -5,25 +5,29 @@ import { fmtDate, money } from '../format'
 import type { QuotaLine, StaleDeal } from '../types'
 import { Avatar, StagePill } from '../theme'
 
-const REASON_PILL: Record<StaleDeal['reasons'][number]['code'], string> = { quiet: 'amber', overdue: 'red', slipping: 'purple' }
+import HealthPill from './HealthPill'
+
+const REASON_PILL: Record<StaleDeal['reasons'][number]['code'], string> = {
+  no_action: 'red', action_overdue: 'amber', quiet: 'amber', overdue: 'red', slipping: 'purple', stalled: 'blue', high_risk: 'red', large: 'teal',
+}
 
 export function QuietDeals({ items, team, staleDays }: { items: StaleDeal[]; team: boolean; staleDays: number }) {
   return (
-    <section className="section" aria-label="Deals going quiet">
+    <section className="section" aria-label="At-risk deals">
       <div className="section-head" style={{ background: 'var(--amber-soft)' }}>
-        <h2 style={{ color: 'var(--amber-ink)' }}>Deals going quiet <span style={{ fontWeight: 500 }}>· {items.length}</span></h2>
-        <span className="muted small">No activity for {staleDays}+ days, close date passed, or pushed back twice</span>
+        <h2 style={{ color: 'var(--amber-ink)' }}>At-risk deals <span style={{ fontWeight: 500 }}>· {items.length}</span></h2>
+        <span className="muted small">Scored on next action, {staleDays}+ quiet days, close date, slips, time in stage and risk</span>
       </div>
-      {items.length === 0 && <div className="action-row muted">Every open deal has recent activity.</div>}
+      {items.length === 0 && <div className="action-row muted">No open deal is at risk.</div>}
       {items.slice(0, 12).map((d) => (
         <div className="action-row quiet-row" key={d.id}>
-          <span className="kind"><StagePill stage={d.stage} /></span>
+          <span className="kind"><HealthPill deal={d} /></span>
           <div className="who">
             <Link to={`/opportunities/${d.id}`} style={{ fontWeight: 600 }}>{d.name}</Link>
             <span className="muted small">{d.account_name} · {money(d.estimated_value, d.currency)}{d.expected_close ? ` · close ${fmtDate(d.expected_close)}` : ''}</span>
           </div>
           <div className="what">
-            <span className="small">Last activity {fmtDate(d.last_touch)}{d.days_in_stage != null ? ` · ${d.days_in_stage} days in stage` : ''}</span>
+            <span className="small"><StagePill stage={d.stage} /> Last activity {fmtDate(d.last_touch)}{d.days_in_stage != null ? ` · ${d.days_in_stage} days in stage` : ''}</span>
             {team && <span className="small row" style={{ gap: 6 }}><Avatar name={d.owner_name} size={20} />{d.owner_name || 'Unassigned'}</span>}
           </div>
           <div className="flags">
@@ -32,7 +36,7 @@ export function QuietDeals({ items, team, staleDays }: { items: StaleDeal[]; tea
           <div className="acts"><Link className="btn btn-outline" to={`/opportunities/${d.id}`}>Open deal</Link></div>
         </div>
       ))}
-      {items.length > 12 && <div className="action-row muted small">and {items.length - 12} more: <Link to="/pipeline">see them flagged on the Pipeline</Link></div>}
+      {items.length > 12 && <div className="action-row muted small">and {items.length - 12} more: <Link to="/deals?health=risk">see them all on Deals</Link></div>}
     </section>
   )
 }

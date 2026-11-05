@@ -15,7 +15,7 @@ type Outcome = 'reactivate' | 'extend' | 'lost'
 type Scope = 'me' | 'team'
 
 const KIND: Record<ActionKind, { label: string; pill: string; path: string }> = {
-  prospect: { label: 'Prospect', pill: 'blue', path: '/prospects/' },
+  prospect: { label: 'Prospect', pill: 'blue', path: '/contacts/' },
   opportunity: { label: 'Opportunity', pill: 'teal', path: '/opportunities/' },
   nurture: { label: 'Nurture revisit', pill: 'purple', path: '/opportunities/' },
 }
@@ -221,7 +221,7 @@ export default function MyActions() {
         <Section title="Overdue" note="Stays until completed, rescheduled or closed" tone={{ bg: 'var(--red-soft)', fg: 'var(--red-ink)' }} items={data.overdue} team={scope === 'team'} onOpen={open} leaving={leaving} />
         <Section title="Due today" note="Reminder on the due date" tone={{ bg: 'var(--amber-soft)', fg: 'var(--amber-ink)' }} items={data.today} team={scope === 'team'} onOpen={open} leaving={leaving} />
         {stale.data && <QuietDeals items={stale.data.items} team={scope === 'team'} staleDays={stale.data.stale_days} />}
-        <Section title="Upcoming" note="Next actions after today" tone={{ bg: 'var(--paper-row)', fg: 'var(--ink)' }} items={data.upcoming} team={scope === 'team'} onOpen={open} leaving={leaving} />
+        <Section title="Upcoming actions" note="Next actions after today" tone={{ bg: 'var(--paper-row)', fg: 'var(--ink)' }} items={data.upcoming} team={scope === 'team'} onOpen={open} leaving={leaving} />
         <Section title="Nurture revisits" note="Routine reminders paused; one reminder on the revisit date" tone={{ bg: 'var(--purple-soft)', fg: 'var(--purple-ink)' }} items={data.nurture} team={scope === 'team'} onOpen={open} leaving={leaving} />
       </>}
     </>

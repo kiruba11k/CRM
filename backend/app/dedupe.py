@@ -263,6 +263,9 @@ async def merge(con: asyncpg.Connection, entity: str, keep_id: UUID, merge_id: U
         moved["deals"] = int((await con.execute("UPDATE opportunities SET account_id = $2 WHERE account_id = $1", merge_id, keep_id)).split()[-1])
     else:
         moved["deals"] = int((await con.execute("UPDATE opportunities SET primary_contact_id = $2 WHERE primary_contact_id = $1", merge_id, keep_id)).split()[-1])
+        await con.execute("DELETE FROM deal_contacts d WHERE d.prospect_id = $1 AND EXISTS "
+                          "(SELECT 1 FROM deal_contacts k WHERE k.prospect_id = $2 AND k.opportunity_id = d.opportunity_id)", merge_id, keep_id)
+        await con.execute("UPDATE deal_contacts SET prospect_id = $2 WHERE prospect_id = $1", merge_id, keep_id)
         last = max([d for d in (keep.get("last_activity_at"), other.get("last_activity_at")) if d], default=None)
         if last and last != keep.get("last_activity_at"):
             upd["last_activity_at"] = last

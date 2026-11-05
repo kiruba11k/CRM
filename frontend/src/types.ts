@@ -34,7 +34,7 @@ export interface Lists {
 export type EditableList = 'sources' | 'nurture_reasons' | 'lost_reasons' | 'service_lines' | 'account_statuses' | 'currencies'
 export interface ReminderSettings {
   meeting_15: boolean; meeting_day: boolean; due_before: boolean; escalation: boolean; escalation_days: number
-  stale_days: number; digest: boolean; digest_hour: number; digest_time_zone: string; digest_weekdays_only: boolean
+  stale_days: number; stalled_days?: number; digest: boolean; digest_hour: number; digest_time_zone: string; digest_weekdays_only: boolean
 }
 export interface SettingsView {
   lists: Record<EditableList, { label: string; options: { value: string; active: boolean; in_use: number; protected: boolean }[] }>
@@ -60,7 +60,7 @@ export interface HistoryEntry { field: string; old_value: string | null; new_val
 export interface Account {
   id: string; name: string; country: string; region: string | null; industry: string | null; owner_id: string | null
   status: string; website: string | null; linkedin_url: string | null; email_domains?: string | null; notes: string | null
-  owner_name?: string | null; prospect_count?: number; open_count?: number; won_count?: number
+  owner_name?: string | null; prospect_count?: number; open_count?: number; won_count?: number; last_activity?: string | null
 }
 
 export interface Prospect {
@@ -69,6 +69,7 @@ export interface Prospect {
   next_action_code: string | null; next_action_other: string | null; next_action_due: string | null; notes: string | null
   next_action_time: string | null; next_action_time_zone: string | null; next_action_in_calendar: boolean
   account_name?: string | null; geography?: string | null; owner_name?: string | null; created_at?: string
+  lifecycle?: string; industry?: string | null; last_activity?: string | null
 }
 
 export interface Opportunity {
@@ -81,7 +82,7 @@ export interface Opportunity {
   next_action_time: string | null; next_action_time_zone: string | null; next_action_in_calendar: boolean
   proposal_due: string | null; delivery_lead: string | null; effort_estimate: string | null
   actual_value: Money; won_date: string | null; lost_date: string | null; lost_reason: string | null; lost_notes: string | null
-  probability: number; weighted_value: Money; next_action_label: string
+  probability: number; weighted_value: Money; next_action_label: string; industry?: string | null; last_activity?: string | null
   account_name?: string; owner_name?: string | null; created_at?: string
 }
 
@@ -195,7 +196,8 @@ export interface StaleDeal {
   id: string; name: string; account_name: string; owner_id: string | null; owner_name: string | null; stage: string
   currency: string; estimated_value: number | string | null; expected_close: string | null; last_touch: string
   days_quiet: number; days_in_stage: number | null; close_pushes: number
-  reasons: { code: 'quiet' | 'overdue' | 'slipping'; label: string }[]
+  reasons: { code: 'quiet' | 'overdue' | 'slipping' | 'no_action' | 'action_overdue' | 'stalled' | 'high_risk' | 'large'; label: string; points?: number }[]
+  score?: number; level?: 'High' | 'Medium' | 'Low'
 }
 export interface StaleResponse { scope: 'me' | 'team'; stale_days: number; count: number; items: StaleDeal[] }
 
@@ -223,7 +225,7 @@ export interface DigestMe {
 export interface DigestPreview { subject: string; html: string; text: string; worth_sending: boolean; counts: Record<string, number> }
 
 // Saved views
-export type SavedViewPage = 'prospects' | 'accounts' | 'pipeline'
+export type SavedViewPage = 'prospects' | 'accounts' | 'pipeline' | 'deals'
 export interface SavedView {
   id: string; page: SavedViewPage; name: string; filters: Record<string, unknown>; shared: boolean
   owner_id: string; owner_name: string; mine: boolean; is_default: boolean; updated_at: string

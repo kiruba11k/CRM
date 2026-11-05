@@ -49,10 +49,10 @@ export default function CommandPalette({ open, onClose, commands }: { open: bool
       id: `o-${o.id}`, group: 'Deals', label: o.name, hint: o.account_name || '', run: go(`/opportunities/${o.id}`), extra: <StagePill stage={o.stage} />,
     }))
     const people = records.prospects.filter((p) => matches(`${p.full_name} ${p.email || ''} ${p.account_name || ''}`, q)).slice(0, 6).map((p) => ({
-      id: `p-${p.id}`, group: 'Prospects', label: p.full_name, hint: [p.job_title, p.account_name].filter(Boolean).join(' · '), run: go(`/prospects/${p.id}`),
+      id: `p-${p.id}`, group: 'Prospects', label: p.full_name, hint: [p.job_title, p.account_name].filter(Boolean).join(' · '), run: go(`/contacts/${p.id}`),
     }))
     const accs = records.accounts.filter((a) => matches(`${a.name} ${a.industry || ''} ${a.country}`, q)).slice(0, 6).map((a) => ({
-      id: `a-${a.id}`, group: 'Accounts', label: a.name, hint: [a.industry, a.country].filter(Boolean).join(' · '), run: go(`/accounts/${a.id}`),
+      id: `a-${a.id}`, group: 'Accounts', label: a.name, hint: [a.industry, a.country].filter(Boolean).join(' · '), run: go(`/companies/${a.id}`),
     }))
     return [...deals, ...people, ...accs, ...cmd.slice(0, 6)]
   }, [q, records, commands, navigate, onClose])

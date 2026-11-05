@@ -12,7 +12,7 @@ from loguru import logger
 from .config import get_settings
 from . import domain, listconfig
 from .db import create_pool, migrate
-from .routers import accounts, actions, admin, bulk, calendar, csv_import, digest as digest_router, email_threads, gmail, insights, people, saved_views, duplicates, attachments, slack as slack_router, hubspot_import, tasks, opportunities, prospects, reports, settings as settings_router
+from .routers import accounts, actions, activities, admin, bulk, calendar, csv_import, digest as digest_router, email_threads, gmail, insights, people, saved_views, duplicates, attachments, slack as slack_router, hubspot_import, tasks, opportunities, prospects, reports, settings as settings_router
 
 
 @asynccontextmanager
@@ -46,7 +46,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         allow_credentials=False,
     )
-    for r in (accounts, prospects, opportunities, actions, reports, admin, hubspot_import, calendar, settings_router, email_threads, tasks, csv_import, insights, digest_router, gmail, people, bulk, saved_views, duplicates, attachments, slack_router):
+    for r in (accounts, prospects, opportunities, actions, reports, admin, hubspot_import, calendar, settings_router, email_threads, tasks, csv_import, insights, digest_router, gmail, people, bulk, saved_views, duplicates, attachments, slack_router, activities):
         app.include_router(r.router, prefix="/api")
 
     @app.get("/health", tags=["health"])

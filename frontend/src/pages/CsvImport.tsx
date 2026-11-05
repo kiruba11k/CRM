@@ -16,7 +16,7 @@ interface Plan { summary: Record<Status | 'new_accounts', number>; rows: PlanRow
 interface Result { message: string; created: number; accounts_created: number; failed: number; failures: { row: number; label: string; message: string }[] }
 
 const ENTITY_LABEL: Record<Entity, string> = { accounts: 'Accounts', prospects: 'Prospects', opportunities: 'Deals' }
-const LIST_PATH: Record<Entity, string> = { accounts: '/accounts', prospects: '/prospects', opportunities: '/pipeline' }
+const LIST_PATH: Record<Entity, string> = { accounts: '/companies', prospects: '/contacts', opportunities: '/pipeline' }
 const STEPS = ['Upload', 'Map columns', 'Options', 'Review', 'Done']
 const STATUS: Record<Status, { label: string; pill: string }> = {
   ready: { label: 'Ready', pill: 'teal' }, cleanup: { label: 'Needs cleanup', pill: 'amber' },
@@ -51,7 +51,7 @@ export function ImportTabs({ active }: { active: 'csv' | 'hubspot' }) {
   )
 }
 
-export default function CsvImport() {
+export default function CsvImport({ embedded = false }: { embedded?: boolean }) {
   const { user, lists } = useSession()
   const [params] = useSearchParams()
   const allowed = can(user, 'import_data')
@@ -111,6 +111,7 @@ export default function CsvImport() {
 
   return (
     <>
+      {!embedded && <>
       <div className="page-head">
         <div>
           <h1>Import</h1>
@@ -118,6 +119,7 @@ export default function CsvImport() {
         </div>
       </div>
       <ImportTabs active="csv" />
+      </>}
       {!allowed && <Banner kind="warn">Bulk import needs the “Bulk import” permission. Ask an admin.</Banner>}
       {allowed && <>
         <nav className="steps" aria-label="Import steps">
@@ -273,7 +275,7 @@ export default function CsvImport() {
             <Banner>{result.message}</Banner>
             <div className="row">
               <Link className="btn btn-dark" to={LIST_PATH[entity]}>Open {ENTITY_LABEL[entity]}</Link>
-              {plan.summary.cleanup > 0 && <Link className="btn" to="/cleanup">Open Needs cleanup ({plan.summary.cleanup})</Link>}
+              {plan.summary.cleanup > 0 && <Link className="btn" to="/data?tab=cleanup">Open Needs cleanup ({plan.summary.cleanup})</Link>}
               {(plan.summary.duplicate + plan.summary.error + result.failed) > 0 && (
                 <button type="button" className="btn" onClick={() => download('import-report.csv', [['Row', 'Record', 'Result', 'Details'],
                   ...plan.rows.filter((r) => r.status === 'duplicate' || r.status === 'error').map((r) => [r.row, r.label, STATUS[r.status].label, r.messages.join(' | ')]),

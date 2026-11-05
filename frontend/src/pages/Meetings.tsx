@@ -14,7 +14,7 @@ import { Banner, ErrorBanner, SelectField, Tabs, TextField, useLoad } from '../u
 
 type Tab = 'schedule' | 'booking' | 'sync'
 const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-const PATH = { account: '/accounts/', prospect: '/prospects/', opportunity: '/opportunities/' } as const
+const PATH = { account: '/companies/', prospect: '/contacts/', opportunity: '/opportunities/' } as const
 
 // "2026-10-29T14:30" + minutes → Google's local "20261029T143000" form.
 function calStamp(local: string, addMinutes = 0): string {

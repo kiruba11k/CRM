@@ -33,7 +33,7 @@ function AccountForm({ form, set, errors }: FormProps) {
     <>
       {dupes.length > 0 && (
         <div className="banner banner-warn" role="alert">
-          <div>Possible duplicate: {dupes.map((d, i) => <span key={d.id}>{i ? ', ' : ''}<Link to={`/accounts/${d.id}`}>{d.name}</Link> ({d.country})</span>)}. Open the existing account instead of creating a second one.</div>
+          <div>Possible duplicate: {dupes.map((d, i) => <span key={d.id}>{i ? ', ' : ''}<Link to={`/companies/${d.id}`}>{d.name}</Link> ({d.country})</span>)}. Open the existing account instead of creating a second one.</div>
         </div>
       )}
       <div className="grid-fields">
@@ -88,7 +88,7 @@ const DEFAULTS: Record<QuickType, FormValues> = {
   opportunity: { stage: 'Lead identified', currency: 'USD', risk_rating: 'Unassessed' },
 }
 const ENDPOINT: Record<QuickType, string> = { account: '/accounts', prospect: '/prospects', opportunity: '/opportunities' }
-const RECORD_PATH: Record<QuickType, string> = { account: '/accounts/', prospect: '/prospects/', opportunity: '/opportunities/' }
+const RECORD_PATH: Record<QuickType, string> = { account: '/companies/', prospect: '/contacts/', opportunity: '/opportunities/' }
 
 export default function QuickCreate({ type: initialType, onClose, onCreated }: { type: QuickType; onClose: () => void; onCreated: () => void }) {
   const { user } = useSession()

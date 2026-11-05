@@ -313,12 +313,20 @@ function RemindersTab({ view, onView }: { view: SettingsView; onView: (v: Settin
           ) : <span className="pill pill-grey">{r.escalation_days} business days</span>}
         </div>
         <div className="list-row">
-          <span style={{ flex: '1 1 320px' }}><strong>Deal going quiet</strong><br /><span className="muted small">Flag an open deal on My Actions, the Pipeline and the digest when nothing has happened on it for this long</span></span>
+          <span style={{ flex: '1 1 320px' }}><strong>Deal going quiet</strong><br /><span className="muted small">Counts towards a deal's health (At-risk deals on My Actions, Deals and the digest) when nothing has happened on it for this long</span></span>
           {admin ? (
             <select className="input" aria-label="Going quiet after days" value={r.stale_days} onChange={(e) => set({ stale_days: Number(e.target.value) })}>
               {[7, 10, 14, 21, 30, 45, 60].map((n) => <option key={n} value={n}>{n} days</option>)}
             </select>
           ) : <span className="pill pill-grey">{r.stale_days} days</span>}
+        </div>
+        <div className="list-row">
+          <span style={{ flex: '1 1 320px' }}><strong>Deal stalled in a stage</strong><br /><span className="muted small">Counts towards a deal's health (At-risk deals) when it has sat in the same stage for this long</span></span>
+          {admin ? (
+            <select className="input" aria-label="Stalled after days" value={r.stalled_days ?? 45} onChange={(e) => set({ stalled_days: Number(e.target.value) })}>
+              {[14, 21, 30, 45, 60, 90, 120].map((n) => <option key={n} value={n}>{n} days</option>)}
+            </select>
+          ) : <span className="pill pill-grey">{r.stalled_days ?? 45} days</span>}
         </div>
         <div className="list-row">
           <span style={{ flex: '1 1 320px' }}><strong>Daily digest email</strong><br /><span className="muted small">Each morning: overdue and due-today actions, deals going quiet and the quarter so far; managers also get a team summary. People with nothing due get no email.</span></span>

@@ -15,6 +15,7 @@ import { fmtDate, money, moneyByCurrency, todayIso, totalsByCurrency } from '../
 import { useSession } from '../session'
 import type { FieldErrors, Opportunity, PipelineReport, StaleResponse } from '../types'
 import SavedViews from '../components/SavedViews'
+import DealsToggle from '../components/DealsToggle'
 import { ErrorBanner, RiskPill, SelectField, useLoad } from '../ui'
 
 
@@ -90,16 +91,16 @@ export default function Pipeline() {
     <>
       <div className="page-head">
         <div>
-          <h1>Pipeline</h1>
+          <h1>Sales Pipeline</h1>
           <p>Open opportunities by sales stage. Drag a card to another stage to move it, or open it to edit. Nurtured opportunities keep their stage but are left out of the active board and forecast.</p>
         </div>
-        <Link className="btn" to="/import?entity=opportunities">Import CSV</Link>
+        <div className="row"><DealsToggle /><Link className="btn" to="/data?tab=import&entity=opportunities">Import CSV</Link></div>
       </div>
       {report.data && (
         <section className="tiles" aria-label="Active forecast">
           <div className="tile"><span className="k">Active forecast · unweighted</span><span className="v" style={{ fontSize: 18 }}>{moneyByCurrency(report.data.active_forecast.unweighted)}</span><span className="s">{report.data.active_forecast.count} open, non-nurtured</span></div>
           <div className="tile"><span className="k">Weighted (value × probability)</span><span className="v" style={{ fontSize: 18, color: 'var(--teal-ink)' }}>{moneyByCurrency(report.data.active_forecast.weighted)}</span><span className="s">Currencies are never added together</span></div>
-          <div className="tile"><span className="k">On nurture</span><span className="v" style={{ fontSize: 18, color: 'var(--purple-ink)' }}>{moneyByCurrency(report.data.nurture.value)}</span><span className="s">{report.data.nurture.count} opportunities · <Link to="/views">Nurture pipeline</Link></span></div>
+          <div className="tile"><span className="k">On nurture</span><span className="v" style={{ fontSize: 18, color: 'var(--purple-ink)' }}>{moneyByCurrency(report.data.nurture.value)}</span><span className="s">{report.data.nurture.count} opportunities · <Link to="/forecast">Nurture pipeline</Link></span></div>
         </section>
       )}
       <SavedViews<ViewState> page="pipeline" defaults={DEFAULT_VIEW} value={{ ...f, nurture: showNurture }}

@@ -10,8 +10,8 @@ import { ErrorBanner, Tabs, useLoad } from '../ui'
 
 type Scope = 'mine' | 'all'
 const KIND: Record<CleanupItem['entity'], { label: string; pill: string; path: string }> = {
-  account: { label: 'Account', pill: 'grey', path: '/accounts/' },
-  prospect: { label: 'Prospect', pill: 'blue', path: '/prospects/' },
+  account: { label: 'Account', pill: 'grey', path: '/companies/' },
+  prospect: { label: 'Prospect', pill: 'blue', path: '/contacts/' },
   opportunity: { label: 'Opportunity', pill: 'teal', path: '/opportunities/' },
 }
 
@@ -35,7 +35,7 @@ export default function Cleanup() {
   )
 }
 
-function RuleBreaks() {
+export function RuleBreaks() {
   const { user } = useSession()
   const [scope, setScope] = useState<Scope>(can(user, 'team_view') ? 'all' : 'mine')
   const { data, error, loading } = useLoad(() => api<CleanupItem[]>('/import/cleanup', { params: { scope } }), [scope])

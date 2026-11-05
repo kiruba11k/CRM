@@ -123,7 +123,7 @@ export default function Reports() {
 
         <div className="cols">
           <section className="card col-side" aria-label="Prospect funnel">
-            <div className="card-head"><h2>Prospect funnel</h2><Link to="/prospects" className="small">Open prospects</Link></div>
+            <div className="card-head"><h2>Prospect funnel</h2><Link to="/leads" className="small">Open prospects</Link></div>
             {funnel.map((f) => (
               <div className="bar-row" key={f.label}>
                 <span>{f.label}</span>

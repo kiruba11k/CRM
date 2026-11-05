@@ -104,6 +104,7 @@ DEFAULT_REMINDERS: dict[str, Any] = {
     "escalation": True,         # flag overdue actions to managers
     "escalation_days": ESCALATION_BUSINESS_DAYS,
     "stale_days": 14,           # open deal with no activity this many days is "going quiet"
+    "stalled_days": 45,         # deal in the same stage this long is flagged as stalled
     "digest": True,             # daily digest email (needs CRM_SMTP_* on the server)
     "digest_hour": 8,           # local hour the digest goes out
     "digest_time_zone": "UTC",  # IANA zone for digest_hour, e.g. Europe/London

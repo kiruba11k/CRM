@@ -69,7 +69,8 @@ async def create_opportunity_record(con: asyncpg.Connection, data: dict, user: U
 
 
 _LIST_SQL = """
-SELECT o.*, a.name AS account_name, u.name AS owner_name
+SELECT o.*, a.name AS account_name, a.industry AS industry, u.name AS owner_name,
+       (SELECT max(x.occurred_at) FROM activities x WHERE x.entity_type = 'opportunity' AND x.entity_id = o.id) AS last_activity
 FROM opportunities o
 JOIN accounts a ON a.id = o.account_id
 LEFT JOIN users u ON u.id = o.owner_id

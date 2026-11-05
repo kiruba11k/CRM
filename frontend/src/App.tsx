@@ -20,31 +20,43 @@ import Views from './pages/Views'
 import Reports from './pages/Reports'
 import Meetings from './pages/Meetings'
 import Settings from './pages/Settings'
-import Import from './pages/Import'
-import CsvImport from './pages/CsvImport'
-import Cleanup from './pages/Cleanup'
+import Home from './pages/Home'
+import Deals from './pages/Deals'
+import Activities from './pages/Activities'
+import Goals from './pages/Goals'
+import DataManagement from './pages/DataManagement'
 
-// Icon rail: [path, full name (tooltip + screen readers), short label, icon path].
+// Sidebar, grouped the way the CRM review recommends (Workspace / CRM /
+// Sales / Analytics & Admin). Item: [path, full name, short label, icon path].
 type NavItem = [string, string, string, string]
-const NAV: NavItem[][] = [
-  [
-    ['/', 'My Actions', 'Actions', 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
-    ['/prospects', 'Prospects', 'Prospects', 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'],
-    ['/pipeline', 'Pipeline', 'Pipeline', 'M4 4h4v16H4zM10 4h4v10h-4zM16 4h4v6h-4z'],
-    ['/accounts', 'Accounts', 'Accounts', 'M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6'],
-  ],
-  [
-    ['/views', 'Forecast & views', 'Forecast', 'M3 3v18h18M7 15l4-4 3 3 5-6'],
-    ['/reports', 'Reports', 'Reports', 'M4 20V10M10 20V4M16 20v-8M22 20H2'],
-    ['/cleanup', 'Cleanup & duplicates', 'Cleanup', 'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0'],
-  ],
-  [
-    ['/meetings', 'Meetings & booking', 'Meetings', 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2'],
-    ['/settings', 'Settings', 'Settings', 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4'],
-    ['/import', 'Import (CSV or HubSpot)', 'Import', 'M12 3v12M7 10l5 5 5-5M5 21h14'],
-  ],
+const I = {
+  home: 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10',
+  actions: 'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
+  contacts: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  companies: 'M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6',
+  leads: 'M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z',
+  deals: 'M20 7h-9M14 17H5M17 21a4 4 0 1 0 0-8 4 4 0 0 0 0 8M7 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
+  activities: 'M22 12h-4l-3 9L9 3l-3 9H2',
+  pipeline: 'M4 4h4v16H4zM10 4h4v10h-4zM16 4h4v6h-4z',
+  forecast: 'M3 3v18h18M7 15l4-4 3 3 5-6',
+  goals: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4',
+  reports: 'M4 20V10M10 20V4M16 20v-8M22 20H2',
+  meetings: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2',
+  data: 'M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6',
+  settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4',
+}
+const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+  { title: 'Workspace', items: [['/home', 'CRM Home', 'Home', I.home], ['/', 'My Actions', 'Actions', I.actions]] },
+  { title: 'CRM', items: [
+    ['/contacts', 'Contacts', 'Contacts', I.contacts], ['/companies', 'Companies', 'Companies', I.companies],
+    ['/leads', 'Leads / Prospects', 'Leads', I.leads], ['/deals', 'Deals', 'Deals', I.deals],
+    ['/activities', 'Activities & Meetings', 'Activities', I.activities]] },
+  { title: 'Sales', items: [['/pipeline', 'Sales Pipeline', 'Pipeline', I.pipeline], ['/forecast', 'Forecast', 'Forecast', I.forecast], ['/goals', 'Sales Goals', 'Goals', I.goals]] },
+  { title: 'Analytics & Admin', items: [
+    ['/reports', 'Reports & Dashboards', 'Reports', I.reports], ['/meetings', 'Meetings & booking', 'Meetings', I.meetings],
+    ['/data', 'Data management', 'Data', I.data], ['/settings', 'Settings', 'Settings', I.settings]] },
 ]
-
+const NAV: NavItem[][] = NAV_GROUPS.map((g) => g.items)
 
 function Login() {
   const { signIn, error } = useSessionState()
@@ -90,6 +102,8 @@ export default function App() {
   const navigate = useNavigate()
   const [theme, toggleTheme] = useTheme()
   const [palette, setPalette] = useState(false)
+  const [navCollapsed, setNavCollapsed] = useState(() => { try { return localStorage.getItem('ls-crm-nav') === 'collapsed' } catch { return false } })
+  const toggleNav = () => setNavCollapsed((c) => { try { localStorage.setItem('ls-crm-nav', c ? 'open' : 'collapsed') } catch { /* private mode */ } return !c })
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette((p) => !p) }
@@ -115,29 +129,32 @@ export default function App() {
   const commands: PaletteCommand[] = [
     ...NAV.flat().map(([to, label]) => ({ id: `nav-${to}`, group: 'Go to', label, run: () => { navigate(to); close() } })),
     { id: 'new-deal', group: 'Create', label: 'New deal', run: () => { setQuick('opportunity'); close() } },
-    { id: 'new-prospect', group: 'Create', label: 'New prospect', run: () => { setQuick('prospect'); close() } },
-    { id: 'new-account', group: 'Create', label: 'New account', run: () => { setQuick('account'); close() } },
+    { id: 'new-prospect', group: 'Create', label: 'New contact / lead', run: () => { setQuick('prospect'); close() } },
+    { id: 'new-account', group: 'Create', label: 'New company', run: () => { setQuick('account'); close() } },
     { id: 'theme', group: 'Preferences', label: theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode', run: () => { toggleTheme(); close() } },
   ]
   return (
     <MotionConfig reducedMotion="user">
     <div className="shell">
-      <nav className="rail" aria-label="Main">
+      <nav className={`rail${navCollapsed ? ' collapsed' : ''}`} aria-label="Main">
         <ProfileMenu user={user} theme={theme} onToggleTheme={toggleTheme} onSignOut={session.signOut} />
         <span className="rail-sep" aria-hidden="true" />
-        {NAV.map((group, gi) => (
-          <div key={gi} style={{ display: 'contents' }}>
-            {gi > 0 && <span className="rail-sep" aria-hidden="true" />}
-            {group.map(([to, label, short, icon]) => (
+        {NAV_GROUPS.map((group) => (
+          <div key={group.title} className="nav-group">
+            <span className="nav-title">{group.title}</span>
+            {group.items.map(([to, label, short, icon]) => (
               <NavLink key={to} to={to} end={to === '/'} className="rail-link" data-tip={label} aria-label={label}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={icon} /></svg>
-                <span aria-hidden="true">{short}</span>
+                <span className="nav-label" aria-hidden="true">{label}</span><span className="nav-short" aria-hidden="true">{short}</span>
               </NavLink>
             ))}
           </div>
         ))}
+        <button type="button" className="nav-collapse" onClick={toggleNav} aria-label={navCollapsed ? 'Expand the sidebar' : 'Collapse the sidebar'} title={navCollapsed ? 'Expand' : 'Collapse'}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={navCollapsed ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} /></svg>
+        </button>
       </nav>
-      <MobileNav main={NAV[0]} more={NAV.slice(1).flat()} user={user} theme={theme} onToggleTheme={toggleTheme} onSignOut={session.signOut} />
+      <MobileNav main={[NAV_GROUPS[0].items[0], NAV_GROUPS[0].items[1], NAV_GROUPS[1].items[3], NAV_GROUPS[1].items[0]]} more={NAV.flat().filter(([to]) => !['/home', '/', '/deals', '/contacts'].includes(to))} user={user} theme={theme} onToggleTheme={toggleTheme} onSignOut={session.signOut} />
       <main className="main">
         <AppNotices />
         <div className="topbar">
@@ -147,7 +164,7 @@ export default function App() {
           </button>
           <div className="row">
             {(['account', 'prospect'] as const).map((t) => (
-              <button key={t} type="button" className="btn topbar-extra" onClick={() => setQuick(t)}>+ {t[0].toUpperCase() + t.slice(1)}</button>
+              <button key={t} type="button" className="btn topbar-extra" onClick={() => setQuick(t)}>+ {t === 'account' ? 'Company' : 'Contact'}</button>
             ))}
             <button type="button" className="btn btn-primary" onClick={() => setQuick('opportunity')}>+ New deal</button>
           </div>
@@ -155,19 +172,30 @@ export default function App() {
         <div className="page-enter" key={location.pathname}>
         <Routes key={refreshKey}>
           <Route path="/" element={<MyActions />} />
-          <Route path="/prospects" element={<Prospects />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/contacts" element={<Prospects mode="contacts" />} />
+          <Route path="/contacts/:id" element={<ProspectRecord />} />
+          <Route path="/leads" element={<Prospects mode="leads" />} />
+          <Route path="/prospects" element={<Navigate to="/leads" replace />} />
           <Route path="/prospects/:id" element={<ProspectRecord />} />
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/opportunities/:id" element={<OpportunityRecord />} />
-          <Route path="/accounts" element={<Accounts />} />
+          <Route path="/companies" element={<Accounts />} />
+          <Route path="/companies/:id" element={<AccountRecord />} />
+          <Route path="/accounts" element={<Navigate to="/companies" replace />} />
+          <Route path="/deals" element={<Deals />} />
+          <Route path="/activities" element={<Activities />} />
+          <Route path="/forecast" element={<Views />} />
+          <Route path="/goals" element={<Goals />} />
+          <Route path="/data" element={<DataManagement />} />
           <Route path="/accounts/:id" element={<AccountRecord />} />
-          <Route path="/views" element={<Views />} />
+          <Route path="/views" element={<Navigate to="/forecast" replace />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/meetings" element={<Meetings />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/import" element={<CsvImport />} />
-          <Route path="/import/hubspot" element={<Import />} />
-          <Route path="/cleanup" element={<Cleanup />} />
+          <Route path="/import" element={<Navigate to="/data?tab=import" replace />} />
+          <Route path="/import/hubspot" element={<Navigate to="/data?tab=hubspot" replace />} />
+          <Route path="/cleanup" element={<Navigate to="/data?tab=cleanup" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         </div>

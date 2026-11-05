@@ -71,3 +71,16 @@ async def pipeline_insights(weeks: int = 12, months: int = 12, con: asyncpg.Conn
         "win_loss": await insights.win_loss(con, months),
         "months": months,
     }
+
+
+@router.get("/home")
+async def home_dashboard(con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+    """Business overview for the Home page."""
+    from .. import home
+    return await home.overview(con)
+
+
+@router.get("/conversion")
+async def stage_conversion(months: int = 12, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+    from .. import home
+    return await home.conversion(con, max(1, min(months, 36)))

@@ -14,7 +14,18 @@ from .opportunities import create_opportunity_record
 router = APIRouter(prefix="/prospects", tags=["prospects"])
 
 _LIST_SQL = """
-SELECT p.*, a.name AS account_name, a.country AS geography, u.name AS owner_name
+SELECT p.*, a.name AS account_name, a.country AS geography, a.industry AS industry, u.name AS owner_name,
+       CASE
+         WHEN p.status = 'Disqualified' THEN 'Disqualified'
+         WHEN EXISTS (SELECT 1 FROM opportunities o LEFT JOIN deal_contacts dc ON dc.opportunity_id = o.id
+                      WHERE o.stage = 'Won' AND (o.primary_contact_id = p.id OR dc.prospect_id = p.id)) THEN 'Customer'
+         WHEN EXISTS (SELECT 1 FROM opportunities o LEFT JOIN deal_contacts dc ON dc.opportunity_id = o.id
+                      WHERE o.stage NOT IN ('Won', 'Lost') AND (o.primary_contact_id = p.id OR dc.prospect_id = p.id)) THEN 'Opportunity'
+         WHEN p.status = 'Nurture' THEN 'Nurture'
+         WHEN p.status = 'Qualified' THEN 'Qualified lead'
+         ELSE 'Lead'
+       END AS lifecycle,
+       (SELECT max(x.occurred_at) FROM activities x WHERE x.entity_type = 'prospect' AND x.entity_id = p.id) AS last_activity
 FROM prospects p
 LEFT JOIN accounts a ON a.id = p.account_id
 LEFT JOIN users u ON u.id = p.owner_id

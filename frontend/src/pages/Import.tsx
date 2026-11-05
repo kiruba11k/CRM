@@ -76,7 +76,7 @@ function RunView({ run }: { run: ImportRun }) {
       <ErrorBanner error={error} onClose={() => setError(null)} />
       {run.status !== 'running' && (
         <div className="row">
-          <Link className="btn btn-dark" to="/cleanup">Open “Needs cleanup”</Link>
+          <Link className="btn btn-dark" to="/data?tab=cleanup">Open “Needs cleanup”</Link>
           <button type="button" className="btn" disabled={!run.error_count}
             onClick={() => downloadFile(`/import/hubspot/runs/${run.id}/errors.csv`, `hubspot-import-${run.id}.csv`).catch((e: ApiError) => setError(e))}>
             Download issue log ({run.error_count})
@@ -88,7 +88,7 @@ function RunView({ run }: { run: ImportRun }) {
   )
 }
 
-export default function Import() {
+export default function Import({ embedded = false }: { embedded?: boolean }) {
   const { user } = useSession()
   const admin = can(user, 'import_data')
   const status = useLoad(() => (admin ? api<ImportStatus>('/import/hubspot/status') : Promise.resolve(null)), [admin])
@@ -139,6 +139,7 @@ export default function Import() {
 
   return (
     <>
+      {!embedded && <>
       <div className="page-head">
         <div>
           <h1>Import</h1>
@@ -146,7 +147,8 @@ export default function Import() {
         </div>
       </div>
       <ImportTabs active="hubspot" />
-      {!admin && <Banner kind="warn">Only admins can run the import. Imported records that need attention appear in <Link to="/cleanup">Needs cleanup</Link>.</Banner>}
+      </>}
+      {!admin && <Banner kind="warn">Only admins can run the import. Imported records that need attention appear in <Link to="/data?tab=cleanup">Needs cleanup</Link>.</Banner>}
       {admin && <>
         <ErrorBanner error={status.error || error} onClose={() => setError(null)} />
         {status.data?.last_run && !run && (
@@ -238,7 +240,7 @@ export default function Import() {
         {step === 3 && issues && (
           <section className="card" aria-label="Data quality">
             <h2>Data quality check before import</h2>
-            <p className="muted" style={{ margin: 0 }}>Records that break the CRM’s rules are still imported, but they land in <Link to="/cleanup">Needs cleanup</Link> for their owner instead of being dropped or silently fixed.</p>
+            <p className="muted" style={{ margin: 0 }}>Records that break the CRM’s rules are still imported, but they land in <Link to="/data?tab=cleanup">Needs cleanup</Link> for their owner instead of being dropped or silently fixed.</p>
             <div>
               {issues.map((i) => (
                 <div className="list-row" key={i.key}>

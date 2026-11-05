@@ -51,7 +51,7 @@ export function RowBox({ sel, id, label }: { sel: Selection; id: string; label: 
   )
 }
 
-export function BulkBar({ entity, sel, onDone }: { entity: BulkEntity; sel: Selection; onDone: () => void }) {
+export function BulkBar({ entity, sel, onDone, onExport }: { entity: BulkEntity; sel: Selection; onDone: () => void; onExport?: () => void }) {
   const { user, lists } = useSession()
   const toast = useToast()
   const [action, setAction] = useState<Action | null>(null)
@@ -139,6 +139,7 @@ export function BulkBar({ entity, sel, onDone }: { entity: BulkEntity; sel: Sele
                   <button key={a} type="button" className={`btn${action === a ? ' btn-dark' : ''}`} aria-pressed={action === a} onClick={() => open(a)}>{LABEL[a]}</button>
                 ))}
               </span>
+              {onExport && <button type="button" className="btn" onClick={onExport}>Export</button>}
               <button type="button" className="btn bulk-clear" onClick={sel.clear}>Clear</button>
             </div>
           </motion.div>

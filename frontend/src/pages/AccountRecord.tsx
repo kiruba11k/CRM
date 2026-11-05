@@ -47,13 +47,13 @@ export default function AccountRecord() {
 
   return (
     <>
-      <div className="muted small"><Link to="/accounts">Accounts</Link> / {data.name}</div>
+      <div className="muted small"><Link to="/companies">Accounts</Link> / {data.name}</div>
       <div className="page-head">
         <div className="row"><h1>{data.name}</h1><span className="pill pill-paper">{data.status}</span></div>
         {canEdit && <button type="button" className="btn btn-primary" onClick={save}>Save</button>}
       </div>
       <ErrorBanner error={error} onClose={() => setError(null)} />
-      {existingId && <Banner kind="warn">That name is taken: <Link to={`/accounts/${existingId}`}>open the existing account</Link>.</Banner>}
+      {existingId && <Banner kind="warn">That name is taken: <Link to={`/companies/${existingId}`}>open the existing account</Link>.</Banner>}
       {saved && <Banner onClose={() => setSaved(false)}>Saved.</Banner>}
       <section className="tiles" aria-label="Account summary">
         <div className="tile"><span className="k">Open pipeline</span><span className="v" style={{ fontSize: 18 }}>{moneyByCurrency(openTotals)}</span><span className="s">{open.length} open, non-nurtured</span></div>
@@ -93,7 +93,7 @@ export default function AccountRecord() {
                 <tbody>
                   {data.prospects.map((p) => (
                     <tr key={p.id}>
-                      <td><Link to={`/prospects/${p.id}`} style={{ fontWeight: 600 }}>{p.full_name}</Link><div className="sub">{p.job_title}</div></td>
+                      <td><Link to={`/contacts/${p.id}`} style={{ fontWeight: 600 }}>{p.full_name}</Link><div className="sub">{p.job_title}</div></td>
                       <td><StatusPill status={p.status} /></td>
                       <td className="muted">{[p.email, p.phone].filter(Boolean).join(' · ') || '—'}</td>
                       <td className="muted">{nextActionLabel(lists, p.next_action_code, p.next_action_other) || '—'} {p.next_action_due && `· ${fmtDate(p.next_action_due)}`}</td>

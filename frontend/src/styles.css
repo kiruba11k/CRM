@@ -728,3 +728,47 @@ main.main:has(.bulk-bar) { padding-bottom: 140px; }
 .slack-events .check { min-height: 30px; }
 .slack-msg { color: var(--ink-soft); overflow-wrap: anywhere; }
 .field > .label { font-size: 13px; font-weight: 600; }
+
+/* Column picker */
+.col-picker { position: relative; }
+.col-menu { position: absolute; right: 0; top: 44px; z-index: 40; min-width: 220px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(15, 17, 35, .16); padding: 8px 12px; display: flex; flex-direction: column; gap: 0; }
+.col-menu .check { min-height: 32px; }
+.list-tools { display: flex; gap: 8px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; }
+.lifecycle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.activity-row { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+.activity-row > .pill { flex: none; min-width: 92px; text-align: center; }
+.activity-meta { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+@media (max-width: 640px) { .activity-row { flex-wrap: wrap; } .activity-meta { width: 100%; } }
+a.tile-link { text-decoration: none; color: inherit; transition: border-color var(--t-fast), transform var(--t-fast) var(--ease-out); }
+a.tile-link:hover { border-color: var(--accent); transform: translateY(-1px); }
+.seg-link { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; font-weight: 600; text-decoration: none; color: var(--ink); background: var(--surface); }
+.seg-link.on { background: var(--accent); color: #fff; }
+.health { display: inline-flex; flex-direction: column; gap: 2px; }
+.health-why { max-width: 360px; }
+
+/* Grouped sidebar (CRM review §4.1): labelled groups, collapsible to the icon rail. */
+.nav-group { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; }
+.nav-title { display: none; }
+.nav-label { display: none; }
+.nav-collapse { flex: none; margin-top: auto; display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 10px;
+  background: none; color: #6B6F82; cursor: pointer; }
+.nav-collapse svg { width: 18px; height: 18px; }
+.nav-collapse:hover { background: var(--paper); color: var(--ink); }
+@media (min-width: 721px) {
+  .rail:not(.collapsed) { flex: 0 0 224px; align-items: stretch; padding: 18px 12px; }
+  .rail:not(.collapsed) .profile-btn { align-self: flex-start; margin-left: 4px; }
+  .rail:not(.collapsed) .rail-sep { width: 100%; }
+  .rail:not(.collapsed) .nav-group { align-items: stretch; margin-bottom: 8px; }
+  .rail:not(.collapsed) .nav-title { display: block; font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--ink-soft); padding: 6px 10px 4px; }
+  .rail:not(.collapsed) .rail-link { width: auto; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 8px 10px; border-radius: 10px;
+    font-size: 14px; font-weight: 600; text-align: left; }
+  .rail:not(.collapsed) .rail-link svg { width: 19px; height: 19px; flex: none; }
+  .rail:not(.collapsed) .nav-label { display: inline; }
+  .rail:not(.collapsed) .nav-short { display: none; }
+  .rail:not(.collapsed) [data-tip]::after { display: none !important; }
+  .rail:not(.collapsed) .nav-collapse { align-self: flex-end; }
+  .rail.collapsed .nav-group + .nav-group { border-top: 1px solid var(--line); padding-top: 4px; margin-top: 2px; }
+}
+@media (max-width: 720px) { .nav-collapse { display: none; } }

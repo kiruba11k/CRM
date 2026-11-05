@@ -35,10 +35,10 @@ CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 REMINDER_LABELS = {
     "meeting_15": "15-minute meeting reminder", "meeting_day": "Day-before meeting reminder",
     "due_before": "Next-business-day flag", "escalation": "Manager escalation", "escalation_days": "Escalate after",
-    "stale_days": "Going-quiet alert after", "digest": "Daily digest email", "digest_hour": "Digest hour",
+    "stale_days": "Going-quiet alert after", "stalled_days": "Stalled-stage flag after", "digest": "Daily digest email", "digest_hour": "Digest hour",
     "digest_time_zone": "Digest time zone", "digest_weekdays_only": "Digest on weekdays only",
 }
-REMINDER_UNITS = {"escalation_days": "business day(s)", "stale_days": "day(s)", "digest_hour": ":00"}
+REMINDER_UNITS = {"escalation_days": "business day(s)", "stale_days": "day(s)", "stalled_days": "day(s)", "digest_hour": ":00"}
 
 LAUNCH_ITEMS: list[tuple[str, str, str, str]] = [
     ("d_platform", "decision", "Build platform", "Custom build: FastAPI, Neon PostgreSQL, React + TypeScript, Render"),
@@ -99,6 +99,7 @@ class RemindersIn(_In):
     escalation: Optional[bool] = None
     escalation_days: Optional[int] = None
     stale_days: Optional[int] = None
+    stalled_days: Optional[int] = None
     digest: Optional[bool] = None
     digest_hour: Optional[int] = None
     digest_time_zone: Optional[str] = None
@@ -270,6 +271,8 @@ async def set_reminders(body: RemindersIn, con: asyncpg.Connection = Depends(get
         raise HTTPException(422, "Escalate after 1 to 20 business days.")
     if "stale_days" in patch and not 3 <= patch["stale_days"] <= 90:
         raise HTTPException(422, "Flag deals as going quiet after 3 to 90 days.")
+    if "stalled_days" in patch and not 7 <= patch["stalled_days"] <= 365:
+        raise HTTPException(422, "Flag stalled stages after 7 to 365 days.")
     if "digest_hour" in patch and not 0 <= patch["digest_hour"] <= 23:
         raise HTTPException(422, "Digest hour must be 0 to 23.")
     if "digest_time_zone" in patch:

@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..auth import User, current_user, get_con
 
 router = APIRouter(prefix="/saved-views", tags=["saved views"])
-Page = Literal["prospects", "accounts", "pipeline"]
+Page = Literal["prospects", "accounts", "pipeline", "deals"]
 MAX_PER_PAGE = 40
 
 _SELECT = """

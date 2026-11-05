@@ -94,7 +94,7 @@ export default function ProspectRecord() {
 
   return (
     <>
-      <div className="muted small"><Link to="/prospects">Prospects</Link>{data.account_id && <> / <Link to={`/accounts/${data.account_id}`}>{accountName || 'Account'}</Link></>}</div>
+      <div className="muted small"><Link to="/leads">Prospects</Link>{data.account_id && <> / <Link to={`/companies/${data.account_id}`}>{accountName || 'Account'}</Link></>}</div>
       <div className="page-head">
         <div className="row">
           <h1>{data.full_name}</h1>
