@@ -6,16 +6,29 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ApiError, api } from '../api'
 import { can, useSession } from '../session'
 import type { FormValues } from '../types'
-import { ErrorBanner, NextActionFields, OwnerField, SelectField } from '../ui'
+import { ErrorBanner, NextActionFields, OwnerField, SelectField, TextField } from '../ui'
+import { useRecordLists } from './RecordLists'
 import { useToast } from './Toast'
 
 export type BulkEntity = 'accounts' | 'prospects' | 'opportunities'
-type Action = 'owner' | 'status' | 'stage' | 'risk' | 'next'
+type Action = 'owner' | 'status' | 'stage' | 'risk' | 'next' | 'prop' | 'list'
 interface BulkResult { requested: number; updated: number; failed: { id: string; name: string | null; message: string }[] }
 
 const NOUN: Record<BulkEntity, [string, string]> = { accounts: ['account', 'accounts'], prospects: ['prospect', 'prospects'], opportunities: ['deal', 'deals'] }
-const ACTIONS: Record<BulkEntity, Action[]> = { accounts: ['owner', 'status'], prospects: ['owner', 'status', 'next'], opportunities: ['owner', 'stage', 'risk', 'next'] }
-const LABEL: Record<Action, string> = { owner: 'Assign owner', status: 'Change status', stage: 'Move stage', risk: 'Set risk', next: 'Set next action' }
+const ACTIONS: Record<BulkEntity, Action[]> = {
+  accounts: ['owner', 'status', 'prop', 'list'], prospects: ['owner', 'status', 'next', 'prop', 'list'], opportunities: ['owner', 'stage', 'risk', 'next', 'prop', 'list'],
+}
+const LABEL: Record<Action, string> = { owner: 'Assign owner', status: 'Change status', stage: 'Move stage', risk: 'Set risk', next: 'Set next action', prop: 'Update property', list: 'Add to list' }
+// Properties that can be set on many records at once (the server allows the same set).
+type Prop = { key: string; label: string; type: 'text' | 'date' | 'select'; options?: (l: ReturnType<typeof useSession>['lists']) => string[] }
+const PROPS: Record<BulkEntity, Prop[]> = {
+  accounts: [{ key: 'industry', label: 'Industry', type: 'text' }, { key: 'country', label: 'Country', type: 'text' },
+    { key: 'company_size', label: 'Company size', type: 'select', options: (l) => l.company_sizes || [] }],
+  prospects: [{ key: 'source', label: 'Source', type: 'select', options: (l) => l.sources }],
+  opportunities: [{ key: 'expected_close', label: 'Expected close date', type: 'date' },
+    { key: 'deal_source', label: 'Deal source', type: 'select', options: (l) => l.sources },
+    { key: 'service_line', label: 'Service line', type: 'select', options: (l) => l.service_lines }],
+}
 
 /** Selection that only ever counts rows currently shown. */
 export function useSelection(visibleIds: string[]) {
@@ -59,6 +72,7 @@ export function BulkBar({ entity, sel, onDone, onExport }: { entity: BulkEntity;
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
   const [result, setResult] = useState<BulkResult | null>(null)
+  const recordLists = useRecordLists(entity)
   const n = sel.selected.length
   const [one, many] = NOUN[entity]
   const actions = ACTIONS[entity].filter((a) => a !== 'owner' || can(user, 'edit_all'))
@@ -71,6 +85,8 @@ export function BulkBar({ entity, sel, onDone, onExport }: { entity: BulkEntity;
     if (action === 'status') return form.status ? { status: form.status } : null
     if (action === 'stage') return form.stage ? { stage: form.stage } : null
     if (action === 'risk') return form.risk_rating ? { risk_rating: form.risk_rating } : null
+    if (action === 'prop') return form.prop && form.value ? { [String(form.prop)]: form.value } : null
+    if (action === 'list') return form.list_id || (form.list_id === '' && String(form.new_name || '').trim()) ? { list: true } : null
     if (action === 'next') return form.next_action_code && form.next_action_due
       ? { next_action_code: form.next_action_code, next_action_other: form.next_action_other || null, next_action_due: form.next_action_due } : null
     return null
@@ -79,6 +95,15 @@ export function BulkBar({ entity, sel, onDone, onExport }: { entity: BulkEntity;
     const c = changes()
     if (!c) return
     setBusy(true); setError(null)
+    if (action === 'list') {
+      try {
+        const id = form.list_id || (await recordLists.create(String(form.new_name).trim())).id
+        const r = await api<{ name: string; added: number }>(`/record-lists/${id}/members`, { method: 'POST', body: { ids: sel.selected } })
+        toast(`Added ${r.added} ${r.added === 1 ? one : many} to “${r.name}”.`)
+        window.dispatchEvent(new Event('record-lists-changed')); setAction(null); sel.clear(); onDone()
+      } catch (e) { setError(e as ApiError) } finally { setBusy(false) }
+      return
+    }
     try {
       const r = await api<BulkResult>(`/bulk/${entity}`, { method: 'POST', body: { ids: sel.selected, changes: c } })
       if (r.updated) toast(`Updated ${r.updated} ${r.updated === 1 ? one : many}.${r.failed.length ? ` ${r.failed.length} skipped.` : ''}`)
@@ -118,15 +143,32 @@ export function BulkBar({ entity, sel, onDone, onExport }: { entity: BulkEntity;
                   {action === 'risk' && <SelectField label="Risk rating" required value={form.risk_rating} onChange={(v) => setForm({ risk_rating: v })} placeholder="Choose…"
                     options={lists.risk_ratings} />}
                   {action === 'next' && <NextActionFields value={form} onChange={setForm} />}
+                  {action === 'prop' && (() => {
+                    const p = PROPS[entity].find((x) => x.key === form.prop)
+                    return <>
+                      <SelectField label="Property" required value={form.prop as string | null} onChange={(v) => setForm({ prop: v, value: null })} placeholder="Choose…"
+                        options={PROPS[entity].map((x) => ({ value: x.key, label: x.label }))} />
+                      {p && (p.type === 'select'
+                        ? <SelectField label={`New ${p.label.toLowerCase()}`} required value={form.value as string | null} onChange={(v) => setForm({ ...form, value: v })} placeholder="Choose…" options={p.options!(lists)} />
+                        : <TextField label={`New ${p.label.toLowerCase()}`} type={p.type === 'date' ? 'date' : 'text'} required value={form.value} onChange={(v) => setForm({ ...form, value: v || null })} />)}
+                    </>
+                  })()}
+                  {action === 'list' && <>
+                    <SelectField label="List" required value={form.list_id === '' ? '__new' : (form.list_id as string | null)} placeholder="Choose…"
+                      onChange={(v) => setForm({ list_id: v === '__new' ? '' : v })}
+                      options={[...recordLists.items.map((l) => ({ value: l.id, label: `${l.name} (${l.size})` })), { value: '__new', label: '+ New list…' }]} />
+                    {form.list_id === '' && <TextField label="New list name" required value={form.new_name} onChange={(v) => setForm({ ...form, new_name: v.slice(0, 80) })} placeholder="e.g. Arab Health 2027 invites" />}
+                  </>}
                 </div>
                 <div className="row" style={{ gap: 8, alignItems: 'center' }}>
                   <button type="button" className="btn btn-dark" disabled={busy || !changes()} onClick={() => void apply()}>
-                    {busy ? 'Saving…' : `Apply to ${n} ${n === 1 ? one : many}`}
+                    {busy ? 'Saving…' : action === 'list' ? `Add ${n} ${n === 1 ? one : many}` : `Apply to ${n} ${n === 1 ? one : many}`}
                   </button>
                   <button type="button" className="btn" onClick={() => setAction(null)}>Cancel</button>
                   <span className="muted small">
                     {action === 'stage' ? 'Each deal must meet the new stage’s rules (e.g. value and risk from Qualified); any that don’t are listed.'
                       : action === 'status' && entity === 'prospects' ? 'Disqualified prospects lose their next action.'
+                      : action === 'list' ? 'Lists are shared with the team and work as a filter on this table. The records themselves don’t change.'
                       : 'Each record’s usual rules and change history apply.'}
                   </span>
                 </div>

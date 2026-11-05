@@ -46,9 +46,27 @@ function AccountForm({ form, set, errors }: FormProps) {
   )
 }
 
+type Dupe = { id: string; full_name: string; email: string | null; account_name: string | null }
+
 function ProspectForm({ form, set, setForm, errors, accounts }: FormProps) {
   const { lists } = useSession()
+  const [dupes, setDupes] = useState<Dupe[]>([])
+  const name = str(form.full_name).trim()
+  const email = str(form.email).trim()
+  useEffect(() => {
+    if (name.length < 4 && !email.includes('@')) { setDupes([]); return }
+    const t = setTimeout(() => {
+      api<Dupe[]>('/prospects/duplicates', { params: { name, email } }).then(setDupes).catch(() => setDupes([]))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [name, email])
   return (
+    <>
+    {dupes.length > 0 && (
+      <div className="banner banner-warn" role="alert">
+        <div>Already in the CRM: {dupes.map((d, i) => <span key={d.id}>{i ? ', ' : ''}<Link to={`/contacts/${d.id}`}>{d.full_name}</Link>{d.account_name ? ` (${d.account_name})` : d.email ? ` (${d.email})` : ''}</span>)}. Open the existing contact instead of creating a second one.</div>
+      </div>
+    )}
     <div className="grid-fields">
       <TextField label="Full name" required value={form.full_name} onChange={(v) => set('full_name', v)} error={errors.full_name} />
       <SelectField label="Account" value={form.account_id} onChange={(v) => set('account_id', v)} placeholder="Not known yet"
@@ -58,6 +76,7 @@ function ProspectForm({ form, set, setForm, errors, accounts }: FormProps) {
       <SelectField label="Status" value={form.status} onChange={(v) => set('status', v)} options={lists.prospect_statuses} />
       <NextActionFields value={form} onChange={setForm} errors={errors} withCalendar />
     </div>
+    </>
   )
 }
 
@@ -90,11 +109,15 @@ const DEFAULTS: Record<QuickType, FormValues> = {
 const ENDPOINT: Record<QuickType, string> = { account: '/accounts', prospect: '/prospects', opportunity: '/opportunities' }
 const RECORD_PATH: Record<QuickType, string> = { account: '/companies/', prospect: '/contacts/', opportunity: '/opportunities/' }
 
-export default function QuickCreate({ type: initialType, onClose, onCreated }: { type: QuickType; onClose: () => void; onCreated: () => void }) {
+export default function QuickCreate({ type: initialType, onClose, onCreated, preset, stay = false }: {
+  type: QuickType; onClose: () => void; onCreated: () => void
+  /** Fields filled in already, e.g. the company when adding from its page. */ preset?: FormValues
+  /** Stay on the current page after creating instead of opening the new record. */ stay?: boolean
+}) {
   const { user } = useSession()
   const navigate = useNavigate()
   const [type, setType] = useState<QuickType>(initialType)
-  const [form, setForm] = useState<FormValues>({ ...DEFAULTS[initialType], owner_id: user.id })
+  const [form, setForm] = useState<FormValues>({ ...DEFAULTS[initialType], owner_id: user.id, ...preset })
   const [error, setError] = useState<ApiError | null>(null)
   const [saving, setSaving] = useState(false)
   const accounts = useLoad(() => api<Account[]>('/accounts'), [])
@@ -106,7 +129,7 @@ export default function QuickCreate({ type: initialType, onClose, onCreated }: {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const switchType = (t: QuickType) => { setType(t); setForm({ ...DEFAULTS[t], owner_id: user.id }); setError(null) }
+  const switchType = (t: QuickType) => { setType(t); setForm({ ...DEFAULTS[t], owner_id: user.id, ...preset }); setError(null) }
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -116,7 +139,7 @@ export default function QuickCreate({ type: initialType, onClose, onCreated }: {
       const created = await api<{ id: string }>(ENDPOINT[type], { method: 'POST', body: compact(form) })
       onCreated()
       onClose()
-      navigate(RECORD_PATH[type] + created.id)
+      if (!stay) navigate(RECORD_PATH[type] + created.id)
     } catch (err) {
       setError(err as ApiError)
     } finally {
@@ -133,14 +156,14 @@ export default function QuickCreate({ type: initialType, onClose, onCreated }: {
           <button type="button" className="btn" onClick={onClose} aria-label="Close">×</button>
         </div>
         <Tabs label="Record type" value={type} onChange={switchType}
-          tabs={[{ value: 'account', label: 'Account' }, { value: 'prospect', label: 'Prospect' }, { value: 'opportunity', label: 'Opportunity' }]} />
+          tabs={[{ value: 'account', label: 'Company' }, { value: 'prospect', label: 'Contact' }, { value: 'opportunity', label: 'Deal' }]} />
         <ErrorBanner error={error} />
         {type === 'account' && <AccountForm {...props} />}
         {type === 'prospect' && <ProspectForm {...props} />}
         {type === 'opportunity' && <OpportunityForm {...props} />}
         <p className="muted small" style={{ margin: 0 }}>Only the required fields are shown here. Add the rest on the record.</p>
         <div className="row">
-          <button type="submit" className="btn btn-dark" disabled={saving}>{saving ? 'Creating…' : `Create ${type}`}</button>
+          <button type="submit" className="btn btn-dark" disabled={saving}>{saving ? 'Creating…' : `Create ${type === 'account' ? 'company' : type === 'prospect' ? 'contact' : 'deal'}`}</button>
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
         </div>
       </form>

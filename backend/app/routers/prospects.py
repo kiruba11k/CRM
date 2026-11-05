@@ -75,6 +75,22 @@ async def create_prospect(body: ProspectIn, request: Request, con: asyncpg.Conne
     return {**row, "warnings": warnings}
 
 
+@router.get("/duplicates")
+async def possible_duplicates(email: Optional[str] = None, name: Optional[str] = None, con: asyncpg.Connection = Depends(get_con),
+                              user: User = Depends(current_user)):
+    """One person, one record (CRM review §8): called as someone types a new
+    contact's email or name. Same email, or the same full name."""
+    email = (email or "").strip().lower()
+    name = " ".join((name or "").split()).lower()
+    if "@" not in email and len(name) < 4:
+        return []
+    rows = await con.fetch(
+        "SELECT p.id, p.full_name, p.email, a.name AS account_name FROM prospects p LEFT JOIN accounts a ON a.id = p.account_id "
+        "WHERE ($1 <> '' AND position('@' in $1) > 0 AND lower(p.email) = $1) OR ($2 <> '' AND length($2) >= 4 AND lower(p.full_name) = $2) "
+        "ORDER BY p.full_name LIMIT 5", email, name)
+    return [dict(r) for r in rows]
+
+
 @router.get("/{prospect_id}")
 async def get_prospect(prospect_id: UUID, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
     p = await get_or_404(con, "prospects", prospect_id, "Prospect")

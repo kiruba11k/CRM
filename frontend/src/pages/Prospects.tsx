@@ -13,6 +13,7 @@ import type { Prospect } from '../types'
 import { BulkBar, RowBox, SelectAllBox, useSelection } from '../components/Bulk'
 import { ColumnPicker, useColumns } from '../components/Columns'
 import SavedViews from '../components/SavedViews'
+import { ListFilter } from '../components/RecordLists'
 import type { SortDir } from '../theme'
 import { CountUp, ErrorBanner, SelectField, StatusPill, Tabs, TextField, useLoad } from '../ui'
 
@@ -36,6 +37,8 @@ export default function Prospects({ mode = 'contacts' }: { mode?: Mode }) {
   const leads = mode === 'leads'
   const [scope, setScope] = useState<Scope>('all')
   const [f, setF] = useState<Filters>(EMPTY)
+  const [listId, setListId] = useState<string | null>(null)
+  const [listIds, setListIds] = useState<Set<string> | null>(null)
   const [exportError, setExportError] = useState<ApiError | null>(null)
   const { data, error, loading, reload } = useLoad(() => api<Prospect[]>('/prospects', { params: { scope } }), [scope])
   const today = todayIso()
@@ -53,7 +56,8 @@ export default function Prospects({ mode = 'contacts' }: { mode?: Mode }) {
     && (!f.country || p.geography === f.country) && (!f.industry || p.industry === f.industry) && (!f.source || p.source === f.source)
     && (!f.next_action || p.next_action_code === f.next_action)
     && (!f.activity || (f.activity === 'never' ? !p.last_activity : f.activity === 'quiet30' ? daysSince(p.last_activity) >= 30 : daysSince(p.last_activity) <= Number(f.activity)))
-    && (!f.q || `${p.full_name} ${p.email || ''} ${p.account_name || ''} ${p.job_title || ''}`.toLowerCase().includes(f.q.toLowerCase()))), [base, f])
+    && (!listIds || listIds.has(p.id))
+    && (!f.q || `${p.full_name} ${p.email || ''} ${p.account_name || ''} ${p.job_title || ''}`.toLowerCase().includes(f.q.toLowerCase()))), [base, f, listIds])
   const countries = [...new Set(base.map((p) => p.geography).filter((g): g is string => !!g))].sort()
   const industries = [...new Set(base.map((p) => p.industry).filter((g): g is string => !!g))].sort()
   const navigate = useNavigate()
@@ -118,6 +122,7 @@ export default function Prospects({ mode = 'contacts' }: { mode?: Mode }) {
       </div>
       <div className="list-tools">
         <span className="muted small">{filtered.length} of {base.length} {leads ? 'leads' : 'contacts'}{JSON.stringify(f) !== JSON.stringify(EMPTY) && <> · <button type="button" className="link-btn" onClick={() => setF(EMPTY)}>Clear filters</button></>}</span>
+        <ListFilter entity="prospects" value={listId} onChange={(id, ids) => { setListId(id); setListIds(ids) }} />
         <ColumnPicker cols={cols} />
       </div>
 

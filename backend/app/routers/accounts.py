@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .. import domain, emaildomains
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
-from ..records import activities, get_or_404, history, insert, raise_if_errors, record_changes, update
-from ..schemas import AccountIn, AccountPatch
+from ..records import activities, get_or_404, history, insert, log_activity, raise_if_errors, record_changes, update
+from ..schemas import AccountIn, AccountPatch, NoteIn
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -127,3 +127,11 @@ async def email_contacts(account_id: UUID, con: asyncpg.Connection = Depends(get
         "AND NOT EXISTS (SELECT 1 FROM prospects p WHERE lower(p.email) = lower(a.addr)) "
         "GROUP BY lower(a.addr) ORDER BY max(x.occurred_at) DESC LIMIT 20", account_id)
     return [dict(r) for r in rows]
+
+
+@router.post("/{account_id}/activities", status_code=201)
+async def add_note(account_id: UUID, body: NoteIn, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+    """A note, call, meeting or email about the company as a whole."""
+    await get_or_404(con, "accounts", account_id, "Account")
+    await log_activity(con, "account", account_id, body.kind, body.summary, user.id)
+    return {"ok": True}

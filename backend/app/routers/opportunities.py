@@ -44,6 +44,7 @@ def _with_derived(row: dict) -> dict:
     return {
         **row,
         "probability": domain.STAGE_PROBABILITY[row["stage"]],
+        "forecast_category": domain.forecast_category(row["stage"], bool(row.get("on_nurture"))),
         "weighted_value": domain.weighted_value(row["estimated_value"], row["stage"]) if row.get("estimated_value") is not None else None,
         "next_action_label": domain.next_action_label(row.get("next_action_code"), row.get("next_action_other")),
     }

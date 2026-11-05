@@ -230,6 +230,27 @@ def _check_follow_up(rec: dict, errors: list[Issue], open_action: bool) -> None:
             errors.append({"field": "next_action_time_zone", "message": "Unknown time zone."})
 
 
+# Forecast categories (CRM review §4.7), from the stage probability:
+FORECAST_CATEGORIES = [
+    ("Commit", "Open deals at 75% or more (Negotiation, Verbal commitment): expected to close."),
+    ("Best case", "Open deals at 40-74% (Solution design, Proposal submitted): could close with work."),
+    ("Pipeline", "Open deals under 40% (Lead identified to Discovery): early, not yet counted on."),
+    ("Omitted", "Deals on nurture: kept out of the forecast until reactivated."),
+]
+
+
+def forecast_category(stage: str, on_nurture: bool = False) -> str:
+    if stage in CLOSED_STAGES:
+        return "Closed " + stage.lower()
+    if on_nurture:
+        return "Omitted"
+    p = STAGE_PROBABILITY.get(stage, 0)
+    return "Commit" if p >= 75 else "Best case" if p >= 40 else "Pipeline"
+
+
+COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-500", "501-1,000", "1,001-5,000", "5,000+"]
+
+
 def validate_account(rec: dict) -> tuple[list[Issue], list[Issue]]:
     errors: list[Issue] = []
     if _blank(rec.get("name")):
@@ -238,6 +259,8 @@ def validate_account(rec: dict) -> tuple[list[Issue], list[Issue]]:
         errors.append({"field": "country", "message": "Geography (country) is required."})
     if rec.get("status") and rec["status"] not in accepted("account_statuses"):
         errors.append({"field": "status", "message": "Unknown account status."})
+    if rec.get("company_size") and rec["company_size"] not in COMPANY_SIZES:
+        errors.append({"field": "company_size", "message": "Choose a company size from the list."})
     return errors, []
 
 
@@ -385,6 +408,8 @@ def lists_payload() -> dict:
         "nurture_reasons": NURTURE_REASONS,
         "lost_reasons": LOST_REASONS,
         "outcomes": [{"code": k, "label": v} for k, v in OUTCOMES.items()],
+        "company_sizes": COMPANY_SIZES,
+        "forecast_categories": [{"name": n, "definition": d} for n, d in FORECAST_CATEGORIES],
         "service_lines": SERVICE_LINES,
         "currencies": CURRENCIES,
         "roles": ROLES,

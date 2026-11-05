@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
 import { useCanEdit, useSession } from '../session'
-import { ActivityCard, HistoryCard } from '../components/Timeline'
+import { ActivityCard, HistoryCard, QuickActions } from '../components/Timeline'
 import { FollowUpStatus, MeetingsCard, TaskStatus } from '../components/Meetings'
 import { GmailCard } from '../components/Gmail'
 import CompleteAction from '../components/CompleteAction'
@@ -137,6 +137,7 @@ export default function ProspectRecord() {
           </section>
         </div>
         <div className="col-main">
+          {canEdit && <QuickActions entityType="prospect" entityId={id} />}
           <section className="card strong" aria-label="Next action">
             <div className="card-head"><h2>Next action</h2>
               {canEdit && !closed && data.next_action_code && !completing && (

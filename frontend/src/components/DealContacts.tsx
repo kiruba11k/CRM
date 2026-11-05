@@ -7,6 +7,32 @@ import type { DealContact, Prospect } from '../types'
 import { Avatar } from '../theme'
 import { ErrorBanner, SelectField, TextField } from '../ui'
 
+function Row({ c, canRemove, onRemove }: { c: DealContact; canRemove: boolean; onRemove: () => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="assoc-item">
+      <div className="assoc-row">
+        <Avatar name={c.full_name} size={30} />
+        <div className="who">
+          <Link to={`/contacts/${c.id}`}>{c.full_name}</Link>
+          <span className="small muted">{[c.role, c.job_title].filter(Boolean).join(' · ') || c.status}</span>
+        </div>
+        <button type="button" className="assoc-toggle" aria-expanded={open} aria-label={`${open ? 'Hide' : 'Show'} details for ${c.full_name}`} onClick={() => setOpen(!open)}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d={open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></svg>
+        </button>
+      </div>
+      {open && (
+        <dl className="assoc-details">
+          <dt>Email</dt><dd>{c.email ? <a href={`mailto:${c.email}`}>{c.email}</a> : '—'}</dd>
+          <dt>Phone</dt><dd>{c.phone || '—'}</dd>
+          <dt>Status</dt><dd>{c.status}</dd>
+          {canRemove && <><dt /><dd><button type="button" className="btn" onClick={onRemove}>Remove from deal</button></dd></>}
+        </dl>
+      )}
+    </div>
+  )
+}
+
 const ROLES = ['Decision maker', 'Champion', 'Influencer', 'Budget holder', 'User', 'Technical evaluator', 'Procurement']
 
 export default function DealContacts({ dealId, contacts, candidates, accountName, canEdit, onChange }: {
@@ -39,16 +65,7 @@ export default function DealContacts({ dealId, contacts, candidates, accountName
       </div>
       <ErrorBanner error={error} onClose={() => setError(null)} />
       {contacts.length === 0 && <p className="muted small" style={{ margin: 0 }}>No contacts on this deal yet. Set a primary contact or add people involved in the decision.</p>}
-      {contacts.map((c) => (
-        <div className="assoc-row" key={c.id}>
-          <Avatar name={c.full_name} size={30} />
-          <div className="who">
-            <Link to={`/contacts/${c.id}`}>{c.full_name}</Link>
-            <span className="small muted">{[c.role, c.job_title].filter(Boolean).join(' · ') || c.status}</span>
-          </div>
-          {canEdit && !c.is_primary && <button type="button" className="btn" aria-label={`Remove ${c.full_name} from the deal`} onClick={() => void remove(c.id)}>Remove</button>}
-        </div>
-      ))}
+      {contacts.map((c) => <Row key={c.id} c={c} canRemove={canEdit && !c.is_primary} onRemove={() => void remove(c.id)} />)}
       {adding && (
         <div className="grid-fields" style={{ gridTemplateColumns: '1fr' }}>
           <SelectField label={`Contact at ${accountName || 'the company'}`} value={pick} onChange={setPick} options={options}

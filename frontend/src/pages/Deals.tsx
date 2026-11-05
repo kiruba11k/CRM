@@ -13,6 +13,7 @@ import { ColumnPicker, useColumns } from '../components/Columns'
 import DealsToggle from '../components/DealsToggle'
 import HealthPill from '../components/HealthPill'
 import SavedViews from '../components/SavedViews'
+import { ListFilter } from '../components/RecordLists'
 import { ErrorBanner, SelectField, TextField, useLoad } from '../ui'
 
 interface Filters { q: string; status: string; owner: string | null; stage: string | null; close: string | null; source: string | null; industry: string | null; min: string; activity: string | null; health: string | null }
@@ -34,11 +35,13 @@ export default function Deals() {
   const hmap = useMemo(() => new Map((health.data?.items || []).map((d) => [d.id, d])), [health.data])
   const [params] = useSearchParams()
   const [f, setF] = useState<Filters>(() => ({ ...EMPTY, health: params.get('health') }))
+  const [listId, setListId] = useState<string | null>(null)
+  const [listIds, setListIds] = useState<Set<string> | null>(null)
   const today = todayIso()
   const cols = useColumns('deals', [
     { key: 'name', label: 'Deal', locked: true }, { key: 'company', label: 'Company' }, { key: 'stage', label: 'Stage' },
     { key: 'amount', label: 'Amount' }, { key: 'weighted', label: 'Weighted', default: false }, { key: 'close', label: 'Close date' },
-    { key: 'owner', label: 'Owner' }, { key: 'next', label: 'Next action' }, { key: 'health', label: 'Health' }, { key: 'risk', label: 'Risk rating', default: false },
+    { key: 'owner', label: 'Owner' }, { key: 'next', label: 'Next action' }, { key: 'health', label: 'Health' }, { key: 'risk', label: 'Risk rating', default: false }, { key: 'category', label: 'Forecast category', default: false },
     { key: 'source', label: 'Source', default: false }, { key: 'service', label: 'Service line', default: false }, { key: 'industry', label: 'Industry', default: false },
     { key: 'activity', label: 'Last activity', default: false },
   ])
@@ -62,15 +65,16 @@ export default function Deals() {
     && (!f.min || Number(o.estimated_value || 0) >= Number(f.min))
     && (!f.activity || (f.activity === '7' ? days(o.last_activity) <= 7 : days(o.last_activity) >= Number(f.activity.replace('quiet', ''))))
     && (!f.health || (f.health === 'healthy' ? !hmap.has(o.id) : f.health === 'risk' ? hmap.has(o.id) : hmap.get(o.id)?.level === f.health))
+    && (!listIds || listIds.has(o.id))
     && (!f.q || `${o.name} ${o.account_name || ''} ${o.owner_name || ''}`.toLowerCase().includes(f.q.toLowerCase())),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [data.data, f, hmap, today])
+  ), [data.data, f, hmap, today, listIds])
   const order = ['High', 'Medium', 'Low']
   const { sorted, sort, by, setSort } = useSort(rows, { key: 'close', dir: 'asc' }, {
     name: (o) => o.name, company: (o) => o.account_name, stage: (o) => lists.stages.findIndex((s) => s.name === o.stage),
     amount: (o) => Number(o.estimated_value || 0), weighted: (o) => Number(o.weighted_value || 0), close: (o) => o.expected_close,
     owner: (o) => o.owner_name, next: (o) => o.next_action_due, health: (o) => { const h = hmap.get(o.id)?.level; return h ? order.indexOf(h) : 9 },
-    risk: (o) => o.risk_rating, source: (o) => o.deal_source, service: (o) => o.service_line, industry: (o) => o.industry, activity: (o) => o.last_activity,
+    risk: (o) => o.risk_rating, category: (o) => o.forecast_category, source: (o) => o.deal_source, service: (o) => o.service_line, industry: (o) => o.industry, activity: (o) => o.last_activity,
   })
   const sel = useSelection(useMemo(() => sorted.map((o) => o.id), [sorted]))
   const navigate = useNavigate()
@@ -111,6 +115,7 @@ export default function Deals() {
       </div>
       <div className="list-tools">
         <span className="muted small">{JSON.stringify(f) !== JSON.stringify(EMPTY) ? <button type="button" className="link-btn" onClick={() => setF(EMPTY)}>Clear filters</button> : 'Open deals, soonest close first'}</span>
+        <ListFilter entity="opportunities" value={listId} onChange={(id, ids) => { setListId(id); setListIds(ids) }} />
         <ColumnPicker cols={cols} />
       </div>
       <ErrorBanner error={data.error} />
@@ -129,6 +134,7 @@ export default function Deals() {
               {cols.has('next') && <SortTh label="Next action" k="next" sort={sort} by={by} />}
               {cols.has('health') && <SortTh label="Health" k="health" sort={sort} by={by} />}
               {cols.has('risk') && <SortTh label="Risk rating" k="risk" sort={sort} by={by} />}
+              {cols.has('category') && <SortTh label="Forecast category" k="category" sort={sort} by={by} />}
               {cols.has('source') && <SortTh label="Source" k="source" sort={sort} by={by} />}
               {cols.has('service') && <SortTh label="Service line" k="service" sort={sort} by={by} />}
               {cols.has('industry') && <SortTh label="Industry" k="industry" sort={sort} by={by} />}
@@ -149,6 +155,7 @@ export default function Deals() {
                   {cols.has('next') && <td><div>{o.next_action_label || '—'}</div><div className="sub" style={{ color: late ? 'var(--red-ink)' : undefined }}>{o.next_action_due ? `${fmtDate(o.next_action_due)}${late ? ' · overdue' : ''}` : ''}</div></td>}
                   {cols.has('health') && <td><HealthPill deal={hmap.get(o.id)} /></td>}
                   {cols.has('risk') && <td className="muted">{o.risk_rating}</td>}
+                  {cols.has('category') && <td className="muted">{o.forecast_category}</td>}
                   {cols.has('source') && <td className="muted">{o.deal_source || '—'}</td>}
                   {cols.has('service') && <td className="muted">{o.service_line || '—'}</td>}
                   {cols.has('industry') && <td className="muted">{o.industry || '—'}</td>}

@@ -8,6 +8,7 @@ import { useSession } from '../session'
 import type { Account } from '../types'
 import { BulkBar, RowBox, SelectAllBox, useSelection } from '../components/Bulk'
 import SavedViews from '../components/SavedViews'
+import { ListFilter } from '../components/RecordLists'
 import type { SortDir } from '../theme'
 import { ErrorBanner, SelectField, Tabs, TextField, useLoad } from '../ui'
 
@@ -31,6 +32,8 @@ export default function Accounts() {
   const [owner, setOwner] = useState<string | null>(null)
   const [industry, setIndustry] = useState<string | null>(null)
   const [activity, setActivity] = useState<string | null>(null)
+  const [listId, setListId] = useState<string | null>(null)
+  const [listIds, setListIds] = useState<Set<string> | null>(null)
   const cols = useColumns('companies', [
     { key: 'status', label: 'Status' }, { key: 'country', label: 'Geography' }, { key: 'owner', label: 'Owner' },
     { key: 'prospects', label: 'Contacts' }, { key: 'open', label: 'Open deals' }, { key: 'won', label: 'Won' }, { key: 'last', label: 'Last activity' },
@@ -40,7 +43,8 @@ export default function Accounts() {
   const rows = useMemo(() => data || [], [data])
   const filtered = useMemo(() => rows.filter((a) => (status === 'all' || a.status === status) && (!country || a.country === country)
     && (!owner || (owner === 'none' ? !a.owner_id : a.owner_id === owner)) && (!industry || a.industry === industry) && activityOk(a.last_activity, activity)
-    && (!q || `${a.name} ${a.industry || ''}`.toLowerCase().includes(q.toLowerCase()))), [rows, status, country, q, owner, industry, activity])
+    && (!listIds || listIds.has(a.id))
+    && (!q || `${a.name} ${a.industry || ''}`.toLowerCase().includes(q.toLowerCase()))), [rows, status, country, q, owner, industry, activity, listIds])
   const industries = [...new Set(rows.map((a) => a.industry).filter((x): x is string => !!x))].sort()
   const countries = [...new Set(rows.map((a) => a.country))].sort()
   const navigate = useNavigate()
@@ -74,6 +78,7 @@ export default function Accounts() {
         <div style={{ width: 200 }}><SelectField label="Owner" value={owner} onChange={setOwner} options={[{ value: 'none', label: 'Unassigned' }, ...users.map((u) => ({ value: u.id, label: u.name }))]} placeholder="Anyone" /></div>
         <div style={{ width: 200 }}><SelectField label="Industry" value={industry} onChange={setIndustry} options={industries} placeholder="Any industry" /></div>
         <div style={{ width: 230 }}><SelectField label="Activity" value={activity} onChange={setActivity} options={ACTIVITY} placeholder="Any" /></div>
+        <ListFilter entity="accounts" value={listId} onChange={(id, ids) => { setListId(id); setListIds(ids) }} />
         <ColumnPicker cols={cols} />
       </div>
       <ErrorBanner error={error} />

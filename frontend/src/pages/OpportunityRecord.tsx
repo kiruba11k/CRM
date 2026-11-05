@@ -6,7 +6,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
 import { money, nextActionLabel, probabilityOf, domainOf } from '../format'
 import { useCanEdit, useSession } from '../session'
-import { ActivityCard, HistoryCard } from '../components/Timeline'
+import { ActivityCard, HistoryCard, QuickActions } from '../components/Timeline'
 import { FollowUpStatus, MeetingsCard, TaskStatus } from '../components/Meetings'
 import { GmailCard } from '../components/Gmail'
 import Attachments from '../components/Attachments'
@@ -209,6 +209,7 @@ export default function OpportunityRecord() {
         </div>
 
         <div className="col-main">
+          {canEdit && <QuickActions entityType="opportunity" entityId={id} />}
           <section className="card strong" aria-label="Next action">
             <div className="card-head"><h2>Next action</h2>
               {canEdit && !closed && !nurtured && data.next_action_code && !completing && (

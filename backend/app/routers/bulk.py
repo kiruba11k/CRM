@@ -22,11 +22,11 @@ router = APIRouter(prefix="/bulk", tags=["bulk"])
 
 NEXT_ACTION = {"next_action_code", "next_action_other", "next_action_due"}
 ENTITIES: dict[str, dict[str, Any]] = {
-    "accounts": {"table": "accounts", "name": "name", "fields": {"owner_id", "status"}, "patch": AccountPatch,
+    "accounts": {"table": "accounts", "name": "name", "fields": {"owner_id", "status", "industry", "country", "company_size"}, "patch": AccountPatch,
                  "update": lambda id_, p, req, con, user: update_account(id_, p, con, user)},
-    "prospects": {"table": "prospects", "name": "full_name", "fields": {"owner_id", "status"} | NEXT_ACTION, "patch": ProspectPatch,
+    "prospects": {"table": "prospects", "name": "full_name", "fields": {"owner_id", "status", "source", "account_id"} | NEXT_ACTION, "patch": ProspectPatch,
                   "update": update_prospect},
-    "opportunities": {"table": "opportunities", "name": "name", "fields": {"owner_id", "stage", "risk_rating"} | NEXT_ACTION,
+    "opportunities": {"table": "opportunities", "name": "name", "fields": {"owner_id", "stage", "risk_rating", "expected_close", "deal_source", "service_line"} | NEXT_ACTION,
                       "patch": OpportunityPatch, "update": update_opportunity},
 }
 MAX = 500

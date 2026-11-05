@@ -125,7 +125,10 @@ async def activities(con: asyncpg.Connection, pairs: Iterable[tuple[str, UUID]],
     ids = [p[1] for p in pairs]
     rows = await con.fetch(
         "SELECT a.id, a.entity_type, a.entity_id, a.kind, a.summary, a.occurred_at, u.name AS created_by, a.created_by AS created_by_id, "
-        "a.email_direction, a.gmail_thread_id, a.outcome, u.email AS created_by_email "
+        "a.email_direction, a.gmail_thread_id, a.outcome, u.email AS created_by_email, "
+        "CASE a.entity_type WHEN 'prospect' THEN (SELECT full_name FROM prospects WHERE id = a.entity_id) "
+        "  WHEN 'opportunity' THEN (SELECT name FROM opportunities WHERE id = a.entity_id) "
+        "  ELSE (SELECT name FROM accounts WHERE id = a.entity_id) END AS record_name "
         "FROM activities a LEFT JOIN users u ON u.id = a.created_by "
         "JOIN unnest($1::text[], $2::uuid[]) AS k(t, i) ON a.entity_type = k.t AND a.entity_id = k.i "
         "ORDER BY a.occurred_at DESC LIMIT $3",

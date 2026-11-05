@@ -24,6 +24,8 @@ export interface Lists {
   sources: string[]
   nurture_reasons: string[]
   lost_reasons: string[]
+  company_sizes?: string[]
+  forecast_categories?: { name: string; definition: string }[]
   service_lines: string[]
   currencies: string[]
   roles: Role[]
@@ -50,7 +52,7 @@ export interface Issue { field: string; message: string }
 export interface Activity {
   id: string; kind: string; summary: string; occurred_at: string; created_by: string | null
   created_by_id?: string | null; created_by_email?: string | null; email_direction?: 'in' | 'out' | null; gmail_thread_id?: string | null
-  outcome?: string | null
+  outcome?: string | null; record_name?: string | null; entity_type?: string; entity_id?: string
 }
 export interface GmailStatus {
   configured: boolean; connected: boolean; granted: boolean; enabled: boolean; first_sync_done: boolean
@@ -62,6 +64,7 @@ export interface Account {
   id: string; name: string; country: string; region: string | null; industry: string | null; owner_id: string | null
   status: string; website: string | null; linkedin_url: string | null; email_domains?: string | null; notes: string | null
   owner_name?: string | null; prospect_count?: number; open_count?: number; won_count?: number; last_activity?: string | null
+  company_size?: string | null
 }
 
 export interface Prospect {
@@ -74,7 +77,7 @@ export interface Prospect {
 }
 
 export interface Opportunity {
-  id: string; name: string; account_id: string; primary_contact_id: string | null; owner_id: string; stage: string
+  id: string; name: string; account_id: string; primary_contact_id: string | null; owner_id: string; stage: string; forecast_category?: string
   estimated_value: Money; currency: string; expected_close: string | null; geography: string; service_line: string | null
   deal_source: string | null; risk_rating: string; high_risk_reason: string | null; risk_mitigation: string | null
   on_nurture: boolean; nurture_reason: string | null; nurture_until: string | null; nurture_owner_id: string | null

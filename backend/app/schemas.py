@@ -31,6 +31,7 @@ class AccountIn(_In):
     website: Optional[str] = None
     linkedin_url: Optional[str] = None
     email_domains: Optional[str] = None
+    company_size: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -44,6 +45,7 @@ class AccountPatch(_In):
     website: Optional[str] = None
     linkedin_url: Optional[str] = None
     email_domains: Optional[str] = None
+    company_size: Optional[str] = None
     notes: Optional[str] = None
 
 

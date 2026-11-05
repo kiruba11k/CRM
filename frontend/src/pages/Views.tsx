@@ -4,6 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { BulkBar, RowBox, SelectAllBox, useSelection } from '../components/Bulk'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
+import { useSession } from '../session'
 import { fmtDate, money, moneyByCurrency, totalsByCurrency } from '../format'
 import type { ForecastPeriod, Opportunity } from '../types'
 import { ErrorBanner, Tabs, useLoad } from '../ui'
@@ -42,6 +43,7 @@ function Table({ cols, rows, onChanged }: { cols: string[]; rows: Row[]; onChang
 }
 
 export default function Views() {
+  const session = useSession()
   const [view, setView] = useState<View>('forecast')
   const all = useLoad(() => api<Opportunity[]>('/opportunities', { params: { include_nurtured: true } }), [])
   const forecast = useLoad(() => api<ForecastPeriod[]>('/reports/forecast'), [])
@@ -57,14 +59,32 @@ export default function Views() {
   }
 
   let body: ReactNode = null
+  const cats = session.lists.forecast_categories || []
+  const inCat = (name: string) => open.filter((o) => o.forecast_category === name)
   if (view === 'forecast') body = <>
+    <section className="card" aria-label="Forecast categories">
+      <div className="card-head"><h2>Forecast categories</h2><span className="muted small">Set by each deal’s stage probability; weighted = value × probability</span></div>
+      <div className="tiles tiles-compact">
+        {cats.map((c) => {
+          const ds = inCat(c.name)
+          return (
+            <div className="tile" key={c.name}>
+              <span className="k">{c.name} · {ds.length}</span>
+              <span className="v" style={{ fontSize: 16 }}>{moneyByCurrency(totalsByCurrency(ds, (o) => o.estimated_value))}</span>
+              {c.name !== 'Omitted' && <span className="s">weighted {moneyByCurrency(totalsByCurrency(ds, (o) => o.weighted_value))}</span>}
+              <span className="s">{c.definition}</span>
+            </div>
+          )
+        })}
+      </div>
+    </section>
     <section className="tiles" aria-label="Forecast by period">
       {(forecast.data || []).map((p) => (
         <div className="tile" key={p.period}><span className="k">{p.period} · {p.count} open</span><span className="v" style={{ fontSize: 16 }}>{moneyByCurrency(p.unweighted)}</span><span className="s">weighted {moneyByCurrency(p.weighted)}</span></div>
       ))}
     </section>
-    <Table onChanged={() => { void all.reload(); void forecast.reload() }} cols={['Stage', 'Probability', 'Expected close', 'Unweighted', 'Weighted']}
-      rows={lists.forecast.map((o) => ({ o, cells: [o.stage, `${o.probability}%`, fmtDate(o.expected_close), money(o.estimated_value, o.currency), money(o.weighted_value, o.currency)] }))} />
+    <Table onChanged={() => { void all.reload(); void forecast.reload() }} cols={['Stage', 'Category', 'Probability', 'Expected close', 'Unweighted', 'Weighted']}
+      rows={lists.forecast.map((o) => ({ o, cells: [o.stage, o.forecast_category || '—', `${o.probability}%`, fmtDate(o.expected_close), money(o.estimated_value, o.currency), money(o.weighted_value, o.currency)] }))} />
   </>
   if (view === 'nurture') body = <>
     <div className="tile" style={{ maxWidth: 360 }}><span className="k">Nurtured value</span><span className="v" style={{ fontSize: 18 }}>{moneyByCurrency(totalsByCurrency(lists.nurture, (o) => o.estimated_value))}</span></div>
