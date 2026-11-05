@@ -96,10 +96,11 @@ async def possible_duplicates(email: Optional[str] = None, name: Optional[str] =
 async def get_prospect(prospect_id: UUID, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
     p = await get_or_404(con, "prospects", prospect_id, "Prospect")
     opps = [dict(r) for r in await con.fetch(
-        "SELECT o.id, o.name, o.stage, o.estimated_value, o.currency, o.on_nurture, 'Primary contact' AS role FROM opportunities o "
-        "WHERE o.primary_contact_id = $1 "
-        "UNION ALL SELECT o.id, o.name, o.stage, o.estimated_value, o.currency, o.on_nurture, coalesce(d.role, 'Contact') FROM deal_contacts d "
-        "JOIN opportunities o ON o.id = d.opportunity_id WHERE d.prospect_id = $1",
+        "SELECT o.id, o.name, o.stage, o.estimated_value, o.currency, o.on_nurture, o.expected_close, o.next_action_code, o.next_action_other, "
+        "o.next_action_due, u.name AS owner_name, x.role FROM ("
+        "  SELECT id, 'Primary contact' AS role FROM opportunities WHERE primary_contact_id = $1 "
+        "  UNION ALL SELECT opportunity_id, coalesce(role, 'Contact') FROM deal_contacts WHERE prospect_id = $1"
+        ") x JOIN opportunities o ON o.id = x.id LEFT JOIN users u ON u.id = o.owner_id",
         prospect_id,
     )]
     lifecycle = await con.fetchval(

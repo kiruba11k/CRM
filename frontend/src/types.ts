@@ -107,7 +107,9 @@ export interface FollowUp {
 }
 
 export interface ProspectDetail extends Prospect {
-  opportunities: (Pick<Opportunity, 'id' | 'name' | 'stage' | 'estimated_value' | 'currency' | 'on_nurture'> & { role?: string | null })[]
+  opportunities: (Pick<Opportunity, 'id' | 'name' | 'stage' | 'estimated_value' | 'currency' | 'on_nurture'> & {
+    role?: string | null; expected_close?: string | null; next_action_code?: string | null; next_action_other?: string | null; next_action_due?: string | null; owner_name?: string | null
+  })[]
   activities: Activity[]; history: HistoryEntry[]; follow_up: FollowUp | null; task: TaskLink | null
 }
 

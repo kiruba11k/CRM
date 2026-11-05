@@ -9,7 +9,8 @@ import { GmailCard } from '../components/Gmail'
 import CompleteAction from '../components/CompleteAction'
 import { CustomFieldsCard } from '../components/CustomFields'
 import { LifecyclePill } from './Prospects'
-import { nextActionLabel } from '../format'
+import { fmtDate, money, nextActionLabel } from '../format'
+import { StagePill } from '../theme'
 import type { Account, FormValue, FormValues, Issue, Opportunity, ProspectDetail } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, changedFields, compact, useLoad, withCurrent } from '../ui'
 
@@ -60,6 +61,33 @@ function ConvertPanel({ prospect, accountName, accounts, onCancel }: { prospect:
         <button type="button" className="btn" onClick={onCancel}>Cancel</button>
       </div>
     </section>
+  )
+}
+
+function ContactDeal({ o }: { o: ProspectDetail['opportunities'][number] }) {
+  const { lists } = useSession()
+  const [open, setOpen] = useState(false)
+  const closed = o.stage === 'Won' || o.stage === 'Lost'
+  return (
+    <div className="assoc-item">
+      <div className="assoc-row">
+        <div className="who">
+          <Link to={`/opportunities/${o.id}`}>{o.name}</Link>
+          <span className="small muted">{money(o.estimated_value, o.currency)}{o.role ? ` · ${o.role}` : ''}{o.on_nurture ? ' · on nurture' : ''}</span>
+        </div>
+        <StagePill stage={o.stage} />
+        <button type="button" className="assoc-toggle" aria-expanded={open} aria-label={`${open ? 'Hide' : 'Show'} details for ${o.name}`} onClick={() => setOpen(!open)}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d={open ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></svg>
+        </button>
+      </div>
+      {open && (
+        <dl className="assoc-details">
+          <dt>Owner</dt><dd>{o.owner_name || '—'}</dd>
+          {!closed && <><dt>Close date</dt><dd>{fmtDate(o.expected_close) || '—'}</dd></>}
+          {!closed && <><dt>Next action</dt><dd>{nextActionLabel(lists, o.next_action_code, o.next_action_other) || '—'}{o.next_action_due ? ` · ${fmtDate(o.next_action_due)}` : ''}</dd></>}
+        </dl>
+      )}
+    </div>
   )
 }
 
@@ -169,12 +197,7 @@ export default function ProspectRecord() {
           <section className="card" aria-label="Deals">
             <div className="card-head"><h2>Deals</h2>{canEdit && !closed && <button type="button" className="btn btn-outline" onClick={() => setConverting(true)}>+ Create deal</button>}</div>
             {data.opportunities.length === 0 && <p className="muted small" style={{ margin: 0 }}>None yet.</p>}
-            {data.opportunities.map((o) => (
-              <Link key={o.id} to={`/opportunities/${o.id}`} className="deal-card">
-                <span className="title">{o.name}</span>
-                <span className="small muted">{o.stage}{o.on_nurture ? ' · on nurture' : ''}{o.role ? ` · ${o.role}` : ''}</span>
-              </Link>
-            ))}
+            {data.opportunities.map((o) => <ContactDeal key={o.id} o={o} />)}
           </section>
           <GmailCard onChange={() => void reload()} entityType="prospect" entityId={id} canEdit={canEdit} domain={null} emails={data.email ? [data.email] : []}
             subject={`LeadStrategus × ${accountName || data.full_name}`} />
