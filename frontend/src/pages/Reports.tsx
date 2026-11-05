@@ -1,5 +1,6 @@
 // §7 Reports & metrics. Every rate shows its numerator, denominator and
 // date window; totals stay per currency (§2.3).
+import OutcomesReport from '../components/OutcomesReport'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
@@ -148,6 +149,8 @@ export default function Reports() {
         </div>
 
         <PipelineInsights />
+
+        <OutcomesReport />
 
         <section className="card" aria-label="Breakdown">
           <Tabs<Group> label="Breakdown" value={group} onChange={setGroup}

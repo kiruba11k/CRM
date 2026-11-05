@@ -106,3 +106,22 @@ async def overview(con: asyncpg.Connection, today: Optional[date] = None) -> dic
         "team": sorted(({"name": k, **v} for k, v in team.items()), key=lambda x: (-x["open"], x["name"])),
         "conversion": await conversion(con, 12, today),
     }
+
+
+async def outcomes(con: asyncpg.Connection, days: int = 90) -> dict:
+    """What completed actions led to, overall and by who logged them."""
+    rows = await con.fetch(
+        "SELECT a.outcome, coalesce(u.name, 'Unknown') AS owner, count(*) AS n FROM activities a LEFT JOIN users u ON u.id = a.created_by "
+        "WHERE a.kind = 'action_completed' AND a.outcome IS NOT NULL AND a.occurred_at >= now() - make_interval(days => $1) "
+        "GROUP BY 1, 2", days)
+    total: dict[str, int] = {k: 0 for k in domain.OUTCOMES}
+    by_owner: dict = defaultdict(lambda: {k: 0 for k in domain.OUTCOMES})
+    for r in rows:
+        total[r["outcome"]] = total.get(r["outcome"], 0) + r["n"]
+        by_owner[r["owner"]][r["outcome"]] += r["n"]
+    return {
+        "days": days,
+        "outcomes": [{"code": k, "label": v, "count": total[k]} for k, v in domain.OUTCOMES.items()],
+        "total": sum(total.values()),
+        "by_owner": sorted(({"name": k, "counts": v, "total": sum(v.values())} for k, v in by_owner.items()), key=lambda x: -x["total"]),
+    }

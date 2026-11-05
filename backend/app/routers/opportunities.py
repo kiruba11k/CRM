@@ -8,8 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import domain, followups, integrations, slack, tasksync
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
-from ..records import activities, get_or_404, history, insert, log_activity, raise_if_errors, record_changes, update
-from ..schemas import CompleteActionIn, NoteIn, OpportunityIn, OpportunityPatch, RevisitIn
+from ..records import (activities, check_outcome, completed_summary, get_or_404, history, insert, log_activity, raise_if_errors,
+                       record_changes, update)
+from ..schemas import CompleteActionIn, DealContactIn, NoteIn, OpportunityIn, OpportunityPatch, RevisitIn
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
 
@@ -118,6 +119,7 @@ async def get_opportunity(opp_id: UUID, con: asyncpg.Connection = Depends(get_co
         "follow_up": await followups.current(con, "opportunity", opp_id),
         "task": await tasksync.current(con, "opportunity", opp_id),
         "warnings": warnings,
+        "contacts": await deal_contacts(con, opp_id),
         "activities": await activities(con, [("opportunity", opp_id)]),
         "history": await history(con, "opportunity", opp_id),
     }
@@ -168,18 +170,81 @@ async def update_opportunity(
 async def complete_action(
     opp_id: UUID, body: CompleteActionIn, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
 ):
+    """Completes the next action and records its outcome. "Not interested"
+    marks the deal Lost; "Moved to nurture" puts it on nurture; anything
+    else needs the next action (§5.3)."""
     before = await get_or_404(con, "opportunities", opp_id, "Opportunity")
     ensure_can_edit(user, before["owner_id"])
     if before["stage"] in domain.CLOSED_STAGES:
         raise HTTPException(409, "This opportunity is closed.")
     if before["on_nurture"]:
         raise HTTPException(409, "This opportunity is on nurture. Use the revisit outcome instead.")
+    check_outcome(body.outcome)
     done = domain.next_action_label(before["next_action_code"], before["next_action_other"]) or "Action"
+    if body.outcome == "not_interested":
+        patch = {"stage": domain.LOST, "lost_reason": body.lost_reason, "lost_notes": body.lost_notes or body.note, "lost_date": date.today()}
+    elif body.outcome == "moved_to_nurture":
+        patch = {"on_nurture": True, "nurture_reason": body.nurture_reason, "nurture_until": body.nurture_until,
+                 "nurture_next_action_code": body.nurture_next_action_code, "nurture_next_action_other": body.nurture_next_action_other,
+                 **{f: None for f in domain.NEXT_ACTION_FIELDS}, "next_action_in_calendar": False}
+    else:
+        patch = body.model_dump(include={*domain.NEXT_ACTION_FIELDS, "next_action_in_calendar"})
     async with con.transaction():
-        await log_activity(con, "opportunity", opp_id, "action_completed", f"Completed: {done}" + (f". {body.note}" if body.note else ""), user.id)
-        result = await _apply_update(con, opp_id, before, body.model_dump(exclude={"note"}), user)
+        await log_activity(con, "opportunity", opp_id, "action_completed", completed_summary(done, body.outcome, body.note), user.id, body.outcome)
+        result = await _apply_update(con, opp_id, before, patch, user)
     await integrations.after_save(request, con, "opportunity", opp_id, completed=True)
+    if result["stage"] != before["stage"]:
+        slack.deal_event(request, before, result, user.name)
     return result
+
+
+@router.get("/{opp_id}/contacts")
+async def list_contacts(opp_id: UUID, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+    await get_or_404(con, "opportunities", opp_id, "Opportunity")
+    return await deal_contacts(con, opp_id)
+
+
+@router.post("/{opp_id}/contacts", status_code=201)
+async def add_contact(opp_id: UUID, body: DealContactIn, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+    """Another buying contact on the deal (besides the primary contact)."""
+    opp = await get_or_404(con, "opportunities", opp_id, "Opportunity")
+    ensure_can_edit(user, opp["owner_id"])
+    p = await get_or_404(con, "prospects", body.prospect_id, "Contact")
+    if opp["primary_contact_id"] == body.prospect_id:
+        raise HTTPException(409, "That person is already the deal's primary contact.")
+    async with con.transaction():
+        await con.execute(
+            "INSERT INTO deal_contacts(opportunity_id, prospect_id, role, added_by) VALUES ($1, $2, $3, $4) "
+            "ON CONFLICT (opportunity_id, prospect_id) DO UPDATE SET role = EXCLUDED.role",
+            opp_id, body.prospect_id, (body.role or "").strip() or None, UUID(user.id))
+        await log_activity(con, "opportunity", opp_id, "contact", f"Added contact: {p['full_name']}" + (f" ({body.role})" if body.role else ""), user.id)
+    return await deal_contacts(con, opp_id)
+
+
+@router.delete("/{opp_id}/contacts/{prospect_id}")
+async def remove_contact(opp_id: UUID, prospect_id: UUID, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+    opp = await get_or_404(con, "opportunities", opp_id, "Opportunity")
+    ensure_can_edit(user, opp["owner_id"])
+    async with con.transaction():
+        name = await con.fetchval(
+            "DELETE FROM deal_contacts d USING prospects p WHERE d.opportunity_id = $1 AND d.prospect_id = $2 AND p.id = d.prospect_id RETURNING p.full_name",
+            opp_id, prospect_id)
+        if name is None:
+            raise HTTPException(404, "That contact isn't on this deal.")
+        await log_activity(con, "opportunity", opp_id, "contact", f"Removed contact: {name}", user.id)
+    return await deal_contacts(con, opp_id)
+
+
+async def deal_contacts(con: asyncpg.Connection, opp_id: UUID) -> list[dict]:
+    """The primary contact first, then the others in the order added."""
+    rows = await con.fetch(
+        "SELECT p.id, p.full_name, p.job_title, p.email, p.phone, p.status, 'Primary contact' AS role, true AS is_primary "
+        "FROM opportunities o JOIN prospects p ON p.id = o.primary_contact_id WHERE o.id = $1 "
+        "UNION ALL "
+        "SELECT * FROM (SELECT p.id, p.full_name, p.job_title, p.email, p.phone, p.status, d.role, false FROM deal_contacts d "
+        "JOIN prospects p ON p.id = d.prospect_id WHERE d.opportunity_id = $1 ORDER BY d.added_at) x",
+        opp_id)
+    return [dict(r) for r in rows]
 
 
 @router.post("/{opp_id}/revisit")

@@ -8,6 +8,7 @@ import { fmtDate } from '../format'
 import { can, useSession } from '../session'
 import type { ActionItem, ActionKind, ActionsResponse, FormValues, QuotaResponse, StaleResponse } from '../types'
 import { AttainmentBar, QuietDeals, lineMoney } from '../components/Insights'
+import CompleteAction from '../components/CompleteAction'
 import { Banner, CountUp, ErrorBanner, NextActionFields, Segmented, SelectField, TextField, useLoad } from '../ui'
 
 type Mode = 'complete' | 'reschedule' | 'revisit'
@@ -23,6 +24,14 @@ const KIND: Record<ActionKind, { label: string; pill: string; path: string }> = 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 
 function ActionPanel({ item, mode, onDone, onCancel }: { item: ActionItem; mode: Mode; onDone: (msg: string) => void; onCancel: () => void }) {
+  if (mode === 'complete' && item.kind !== 'nurture') {
+    return <CompleteAction kind={item.kind} id={item.id} title={item.title} current={item.label} onDone={onDone} onCancel={onCancel}
+      closeLink={<Link className="btn" to={KIND[item.kind].path + item.id}>Open the record</Link>} />
+  }
+  return <ActionPanelForm item={item} mode={mode} onDone={onDone} onCancel={onCancel} />
+}
+
+function ActionPanelForm({ item, mode, onDone, onCancel }: { item: ActionItem; mode: Mode; onDone: (msg: string) => void; onCancel: () => void }) {
   const { lists } = useSession()
   const [form, setForm] = useState<FormValues>(mode === 'reschedule'
     ? { next_action_code: item.code, next_action_other: item.other, next_action_due: null, next_action_time: item.due_time, next_action_in_calendar: item.in_calendar }

@@ -50,6 +50,7 @@ export interface Issue { field: string; message: string }
 export interface Activity {
   id: string; kind: string; summary: string; occurred_at: string; created_by: string | null
   created_by_id?: string | null; created_by_email?: string | null; email_direction?: 'in' | 'out' | null; gmail_thread_id?: string | null
+  outcome?: string | null
 }
 export interface GmailStatus {
   configured: boolean; connected: boolean; granted: boolean; enabled: boolean; first_sync_done: boolean
@@ -90,6 +91,10 @@ export interface OpportunityDetail extends Opportunity {
   database_build_team: { id: string; name: string }[]
   proposal_team: { id: string; name: string }[]
   warnings: Issue[]; activities: Activity[]; history: HistoryEntry[]; follow_up: FollowUp | null; task: TaskLink | null
+  contacts?: DealContact[]
+}
+export interface DealContact {
+  id: string; full_name: string; job_title: string | null; email: string | null; phone: string | null; status: string; role: string | null; is_primary: boolean
 }
 
 // The calendar event kept for a next action with a time (§6.1).
@@ -99,7 +104,7 @@ export interface FollowUp {
 }
 
 export interface ProspectDetail extends Prospect {
-  opportunities: Pick<Opportunity, 'id' | 'name' | 'stage' | 'estimated_value' | 'currency' | 'on_nurture'>[]
+  opportunities: (Pick<Opportunity, 'id' | 'name' | 'stage' | 'estimated_value' | 'currency' | 'on_nurture'> & { role?: string | null })[]
   activities: Activity[]; history: HistoryEntry[]; follow_up: FollowUp | null; task: TaskLink | null
 }
 

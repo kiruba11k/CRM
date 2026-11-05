@@ -84,3 +84,10 @@ async def home_dashboard(con: asyncpg.Connection = Depends(get_con), user: User 
 async def stage_conversion(months: int = 12, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
     from .. import home
     return await home.conversion(con, max(1, min(months, 36)))
+
+
+@router.get("/outcomes")
+async def action_outcomes(days: int = 90, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
+    """Outcomes of completed actions over the last `days` days."""
+    from .. import home
+    return await home.outcomes(con, max(7, min(days, 365)))

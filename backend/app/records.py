@@ -13,6 +13,8 @@ from uuid import UUID
 import asyncpg
 from fastapi import HTTPException
 
+from . import domain
+
 # Fields whose changes are written to record_history (§8.3).
 TRACKED_FIELDS = {
     "account": ["name", "owner_id", "status", "country"],
@@ -87,11 +89,22 @@ async def record_changes(
     return len(rows)
 
 
-async def log_activity(con: asyncpg.Connection, entity_type: str, entity_id: UUID, kind: str, summary: str, user_id: str) -> None:
+async def log_activity(con: asyncpg.Connection, entity_type: str, entity_id: UUID, kind: str, summary: str, user_id: str,
+                       outcome: Optional[str] = None) -> None:
     await con.execute(
-        "INSERT INTO activities(entity_type, entity_id, kind, summary, created_by) VALUES ($1, $2, $3, $4, $5)",
-        entity_type, entity_id, kind, summary, UUID(user_id),
+        "INSERT INTO activities(entity_type, entity_id, kind, summary, created_by, outcome) VALUES ($1, $2, $3, $4, $5, $6)",
+        entity_type, entity_id, kind, summary, UUID(user_id), outcome,
     )
+
+
+def completed_summary(done: str, outcome: Optional[str], note: Optional[str]) -> str:
+    """'Completed: Call prospect · Meeting booked. note'"""
+    return f"Completed: {done}" + (f" · {domain.OUTCOMES[outcome]}" if outcome else "") + (f". {note}" if note else "")
+
+
+def check_outcome(outcome: Optional[str]) -> None:
+    if outcome is not None and outcome not in domain.OUTCOMES:
+        raise HTTPException(422, {"message": "Fix the highlighted fields before saving.", "errors": [{"field": "outcome", "message": "Unknown outcome."}]})
 
 
 async def history(con: asyncpg.Connection, entity_type: str, entity_id: UUID) -> list[dict]:

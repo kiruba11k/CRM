@@ -38,6 +38,16 @@ NEXT_ACTIONS: dict[str, str] = {
 OTHER_CODE = "18"
 OTHER_MAX_LEN = 50  # §5.2
 
+# ── Outcome recorded when an action is completed (CRM review §4.5).
+OUTCOMES: dict[str, str] = {
+    "connected": "Connected",
+    "no_response": "No response",
+    "meeting_booked": "Meeting booked",
+    "proposal_requested": "Proposal requested",
+    "not_interested": "Not interested",
+    "moved_to_nurture": "Moved to nurture",
+}
+
 # ── §3.2 Opportunity stages + starter probabilities (ordered)
 STAGES: list[tuple[str, int]] = [
     ("Lead identified", 5),
@@ -374,6 +384,7 @@ def lists_payload() -> dict:
         "sources": SOURCES,
         "nurture_reasons": NURTURE_REASONS,
         "lost_reasons": LOST_REASONS,
+        "outcomes": [{"code": k, "label": v} for k, v in OUTCOMES.items()],
         "service_lines": SERVICE_LINES,
         "currencies": CURRENCIES,
         "roles": ROLES,

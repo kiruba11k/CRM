@@ -5,6 +5,17 @@ import { fmtDate, fmtDateTime, nextActionLabel, userName } from '../format'
 import { can, useSession } from '../session'
 import type { Activity, HistoryEntry, Lists, User } from '../types'
 import { ErrorBanner, SelectField, TextField } from '../ui'
+import { OUTCOME_LABEL, OUTCOME_TONE } from './CompleteAction'
+
+// Timeline filter: which activity kinds each chip shows.
+const FILTERS: { key: string; label: string; kinds: string[] | null }[] = [
+  { key: 'all', label: 'All', kinds: null },
+  { key: 'notes', label: 'Notes & calls', kinds: ['note', 'call'] },
+  { key: 'email', label: 'Emails', kinds: ['email'] },
+  { key: 'meeting', label: 'Meetings', kinds: ['meeting'] },
+  { key: 'actions', label: 'Actions', kinds: ['action_completed'] },
+  { key: 'changes', label: 'Changes', kinds: ['stage_change', 'status_change', 'nurture', 'contact', 'attachment', 'converted', 'merged'] },
+]
 
 const FIELD_LABEL: Record<string, string> = {
   stage: 'Stage', owner_id: 'Owner', estimated_value: 'Estimated value', currency: 'Currency', expected_close: 'Expected close',
@@ -16,6 +27,7 @@ type NoteKind = 'note' | 'call' | 'meeting' | 'email'
 
 export function ActivityCard({ activities, postUrl, onAdded }: { activities: Activity[] | undefined; postUrl?: string; onAdded?: () => void }) {
   const [kind, setKind] = useState<NoteKind>('note')
+  const [filter, setFilter] = useState('all')
   const [summary, setSummary] = useState('')
   const [error, setError] = useState<ApiError | null>(null)
   async function add() {
@@ -28,7 +40,7 @@ export function ActivityCard({ activities, postUrl, onAdded }: { activities: Act
   }
   return (
     <section className="card" aria-label="Activity">
-      <h2>Activity</h2>
+      <div className="card-head"><h2>Activity</h2></div>
       {postUrl && <>
         <ErrorBanner error={error} onClose={() => setError(null)} />
         <div className="grid-fields" style={{ gridTemplateColumns: '140px minmax(0, 1fr)' }}>
@@ -38,12 +50,18 @@ export function ActivityCard({ activities, postUrl, onAdded }: { activities: Act
         </div>
         <button type="button" className="btn btn-outline" style={{ alignSelf: 'flex-start' }} onClick={add} disabled={!summary.trim()}>Log activity</button>
       </>}
+      <div className="outcome-chips timeline-filter" role="group" aria-label="Show">
+        {FILTERS.map((f) => {
+          const n = f.kinds ? (activities || []).filter((a) => f.kinds!.includes(a.kind)).length : (activities || []).length
+          return <button key={f.key} type="button" className="outcome-chip" aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}>{f.label} <span className="muted">{n}</span></button>
+        })}
+      </div>
       <div>
-        {(activities || []).map((a) => (
+        {(activities || []).filter((a) => { const k = FILTERS.find((f) => f.key === filter)?.kinds; return !k || k.includes(a.kind) }).map((a) => (
           <div className="timeline-item" key={a.id}>
             <span className="muted small">{fmtDateTime(a.occurred_at)}</span>
             {a.email_direction ? <AutoEmail a={a} onRemoved={onAdded} /> : (
-              <span><strong>{a.summary}</strong> <span className="muted">· {a.kind.replace('_', ' ')}{a.created_by ? ` · ${a.created_by}` : ''}</span></span>
+              <span><strong>{a.outcome ? a.summary.replace(` · ${OUTCOME_LABEL[a.outcome]}`, '') : a.summary}</strong>{a.outcome && <> <span className={`pill pill-${OUTCOME_TONE[a.outcome] || 'grey'}`}>{OUTCOME_LABEL[a.outcome] || a.outcome}</span></>} <span className="muted">· {a.kind.replace('_', ' ')}{a.created_by ? ` · ${a.created_by}` : ''}</span></span>
             )}
           </div>
         ))}

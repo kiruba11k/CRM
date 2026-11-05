@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class _In(BaseModel):
@@ -147,11 +147,26 @@ class ConvertProspectIn(_In):
     next_action_in_calendar: bool = False
 
 
+class DealContactIn(_In):
+    prospect_id: UUID
+    role: Optional[str] = Field(None, max_length=60)
+
+
 class CompleteActionIn(_In):
     """§5.3: completing an action asks for the next one. The next action
     and due date are required, but by domain.py, so the user gets the same
     plain-language errors as everywhere else."""
     note: Optional[str] = None
+    # What happened (domain.OUTCOMES). "not_interested" closes the record
+    # (Lost / Disqualified); "moved_to_nurture" puts it on nurture.
+    outcome: Optional[str] = None
+    lost_reason: Optional[str] = None
+    lost_notes: Optional[str] = None
+    disqualified_reason: Optional[str] = None
+    nurture_reason: Optional[str] = None
+    nurture_until: Optional[date] = None
+    nurture_next_action_code: Optional[str] = None
+    nurture_next_action_other: Optional[str] = None
     next_action_code: Optional[str] = None
     next_action_other: Optional[str] = None
     next_action_due: Optional[date] = None

@@ -4,12 +4,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, api } from '../api'
-import { money, probabilityOf, domainOf } from '../format'
+import { money, nextActionLabel, probabilityOf, domainOf } from '../format'
 import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import { FollowUpStatus, MeetingsCard, TaskStatus } from '../components/Meetings'
 import { GmailCard } from '../components/Gmail'
 import Attachments from '../components/Attachments'
+import CompleteAction from '../components/CompleteAction'
+import DealContacts from '../components/DealContacts'
 import { StagePill } from '../theme'
 import type { Account, AccountDetail, FormValue, FormValues, Issue, OpportunityDetail, Prospect } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, TextField, WarningsBanner, changedFields, useLoad, withCurrent } from '../ui'
@@ -54,6 +56,8 @@ export default function OpportunityRecord() {
   const [error, setError] = useState<ApiError | null>(null)
   const [saved, setSaved] = useState<Issue[] | null>(null)
   const [more, setMore] = useState(false)
+  const [completing, setCompleting] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const canEdit = useCanEdit(data?.owner_id)
   const accountId = form?.account_id as string | null | undefined
 
@@ -100,7 +104,7 @@ export default function OpportunityRecord() {
 
   return (
     <>
-      <div className="muted small"><Link to="/pipeline">Pipeline</Link> / {account ? <Link to={`/companies/${account.id}`}>{account.name}</Link> : 'Account'}</div>
+      <div className="muted small"><Link to="/deals">Deals</Link> / {account ? <Link to={`/companies/${account.id}`}>{account.name}</Link> : 'Account'}</div>
       <div className="page-head">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <h1>{data.name}</h1>
@@ -121,21 +125,11 @@ export default function OpportunityRecord() {
       {!canEdit && <Banner kind="warn">You can view this opportunity. Only its owner, a manager or an admin can edit it.</Banner>}
       <ErrorBanner error={error} onClose={() => setError(null)} />
       {saved && <Banner onClose={() => setSaved(null)}>Saved. Changes to stage, risk, nurture and value are kept in the history.</Banner>}
+      {notice && <Banner onClose={() => setNotice(null)}>{notice}</Banner>}
       <WarningsBanner warnings={saved || data.warnings} />
 
-      <div className="cols">
-        <div className="col-main">
-          <section className="card strong" aria-label="Next action">
-            <div className="card-head"><h2>Next action</h2><span className="muted small">Same 18-option list as prospects</span></div>
-            {closed ? <p className="muted" style={{ margin: 0 }}>Closed: open-deal reminders have stopped.</p>
-              : nurtured ? <p className="muted" style={{ margin: 0 }}>On nurture: routine reminders are paused. The nurture next action below drives the revisit reminder.</p>
-              : <>
-                  <div className="grid-fields"><NextActionFields value={form} onChange={setForm} errors={errors} withCalendar /></div>
-                  <FollowUpStatus followUp={data.follow_up} onChange={() => void reload()} />
-                </>}
-            <TaskStatus task={data.task} onChange={() => void reload()} />
-          </section>
-
+      <div className="cols three">
+        <div className="col-props">
           <section className="card" aria-label="Opportunity">
             <div className="card-head"><h2>Opportunity</h2><span className="muted small">Required fields depend on the stage</span></div>
             <div className="grid-fields">
@@ -212,20 +206,45 @@ export default function OpportunityRecord() {
               <TeamPicker label="Internal database-build team" value={teams.database_build_team} onChange={(v) => setTeams({ ...teams, database_build_team: v })} />
             </section>
           )}
+        </div>
+
+        <div className="col-main">
+          <section className="card strong" aria-label="Next action">
+            <div className="card-head"><h2>Next action</h2>
+              {canEdit && !closed && !nurtured && data.next_action_code && !completing && (
+                <div className="quick-acts"><button type="button" className="btn btn-dark" onClick={() => setCompleting(true)}>Complete action…</button></div>
+              )}
+            </div>
+            {closed ? <p className="muted" style={{ margin: 0 }}>Closed: open-deal reminders have stopped.</p>
+              : nurtured ? <p className="muted" style={{ margin: 0 }}>On nurture: routine reminders are paused. The nurture next action below drives the revisit reminder.</p>
+              : <>
+                  <div className="grid-fields"><NextActionFields value={form} onChange={setForm} errors={errors} withCalendar /></div>
+                  <FollowUpStatus followUp={data.follow_up} onChange={() => void reload()} />
+                </>}
+            <TaskStatus task={data.task} onChange={() => void reload()} />
+          </section>
+
+          {completing && (
+            <CompleteAction kind="opportunity" id={id} title={data.name} current={nextActionLabel(lists, data.next_action_code, data.next_action_other)}
+              onCancel={() => setCompleting(false)} onDone={(msg) => { setCompleting(false); setNotice(msg); void reload() }} />
+          )}
           <ActivityCard activities={data.activities} postUrl={`/opportunities/${id}/activities`} onAdded={() => void reload()} />
         </div>
 
         <div className="col-side">
-          <section className="card" aria-label="Contacts">
-            <h2>Contacts at {account?.name || 'this account'}</h2>
-            {contacts.length === 0 && <p className="muted small" style={{ margin: 0 }}>No prospects linked to this account yet.</p>}
-            {contacts.map((p) => (
-              <Link key={p.id} to={`/contacts/${p.id}`} className="deal-card">
-                <span className="title">{p.full_name}{p.id === data.primary_contact_id ? ' · primary' : ''}</span>
-                <span className="small muted">{p.job_title || p.status}</span>
-              </Link>
-            ))}
+          <section className="card" aria-label="Company">
+            <div className="card-head"><h2>Company</h2>{account && <Link className="small" to={`/companies/${account.id}`}>Open</Link>}</div>
+            {account ? (
+              <div className="assoc-row">
+                <span className="rail-brand" style={{ width: 34, height: 34, borderRadius: 10, margin: 0, fontSize: 13, boxShadow: 'none' }} aria-hidden="true">{account.name.slice(0, 2).toUpperCase()}</span>
+                <div className="who">
+                  <Link to={`/companies/${account.id}`}>{account.name}</Link>
+                  <span className="small muted">{[account.industry, account.country, account.status].filter(Boolean).join(' · ')}</span>
+                </div>
+              </div>
+            ) : <p className="muted small" style={{ margin: 0 }}>Not linked to a company.</p>}
           </section>
+          <DealContacts dealId={id} contacts={data.contacts || []} candidates={contacts} accountName={account?.name} canEdit={canEdit} onChange={() => void reload()} />
           <Attachments entityType="opportunity" entityId={id} canEdit={canEdit} onChange={() => void reload()} />
           <GmailCard onChange={() => void reload()} entityType="opportunity" entityId={id} canEdit={canEdit} domain={domainOf(account?.website)}
             emails={primary?.email ? [primary.email] : contacts.map((p) => p.email || '')}

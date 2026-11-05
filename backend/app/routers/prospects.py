@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import domain, followups, integrations, slack, tasksync
 from ..auth import User, current_user, ensure_can_assign, ensure_can_edit, get_con
-from ..records import activities, get_or_404, history, insert, log_activity, raise_if_errors, record_changes, update
+from ..records import (activities, check_outcome, completed_summary, get_or_404, history, insert, log_activity, raise_if_errors,
+                       record_changes, update)
 from ..schemas import CompleteActionIn, ConvertProspectIn, NoteIn, ProspectIn, ProspectPatch
 from .opportunities import create_opportunity_record
 
@@ -78,11 +79,23 @@ async def create_prospect(body: ProspectIn, request: Request, con: asyncpg.Conne
 async def get_prospect(prospect_id: UUID, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)):
     p = await get_or_404(con, "prospects", prospect_id, "Prospect")
     opps = [dict(r) for r in await con.fetch(
-        "SELECT id, name, stage, estimated_value, currency, on_nurture FROM opportunities WHERE primary_contact_id = $1 ORDER BY created_at DESC",
+        "SELECT o.id, o.name, o.stage, o.estimated_value, o.currency, o.on_nurture, 'Primary contact' AS role FROM opportunities o "
+        "WHERE o.primary_contact_id = $1 "
+        "UNION ALL SELECT o.id, o.name, o.stage, o.estimated_value, o.currency, o.on_nurture, coalesce(d.role, 'Contact') FROM deal_contacts d "
+        "JOIN opportunities o ON o.id = d.opportunity_id WHERE d.prospect_id = $1",
         prospect_id,
     )]
+    lifecycle = await con.fetchval(
+        "SELECT CASE WHEN p.status = 'Disqualified' THEN 'Disqualified' "
+        "WHEN EXISTS (SELECT 1 FROM opportunities o LEFT JOIN deal_contacts dc ON dc.opportunity_id = o.id "
+        "  WHERE o.stage = 'Won' AND (o.primary_contact_id = p.id OR dc.prospect_id = p.id)) THEN 'Customer' "
+        "WHEN EXISTS (SELECT 1 FROM opportunities o LEFT JOIN deal_contacts dc ON dc.opportunity_id = o.id "
+        "  WHERE o.stage NOT IN ('Won', 'Lost') AND (o.primary_contact_id = p.id OR dc.prospect_id = p.id)) THEN 'Opportunity' "
+        "WHEN p.status = 'Nurture' THEN 'Nurture' WHEN p.status = 'Qualified' THEN 'Qualified lead' ELSE 'Lead' END "
+        "FROM prospects p WHERE p.id = $1", prospect_id)
     return {
         **p,
+        "lifecycle": lifecycle,
         "follow_up": await followups.current(con, "prospect", prospect_id),
         "task": await tasksync.current(con, "prospect", prospect_id),
         "opportunities": opps,
@@ -117,25 +130,44 @@ async def update_prospect(
     return {**row, "warnings": warnings}
 
 
+# Outcomes that move a prospect's status forward (never backward).
+_ADVANCE = {"no_response": "Contacted", "connected": "Engaged", "meeting_booked": "Engaged", "proposal_requested": "Engaged"}
+_ORDER = ["New", "Contacted", "Engaged", "Qualified"]
+
+
 @router.post("/{prospect_id}/complete-action")
 async def complete_action(
     prospect_id: UUID, body: CompleteActionIn, request: Request, con: asyncpg.Connection = Depends(get_con), user: User = Depends(current_user)
 ):
+    """Completes the next action and records its outcome. "Not interested"
+    disqualifies the prospect; "Moved to nurture" sets status Nurture; a
+    reply or meeting moves New / Contacted forward. All but "Not
+    interested" need the next action (§5.3)."""
     before = await get_or_404(con, "prospects", prospect_id, "Prospect")
     ensure_can_edit(user, before["owner_id"])
     if before["status"] in domain.CLOSED_PROSPECT_STATUSES:
         raise HTTPException(409, "This prospect is closed. Reopen it before adding a next action.")
-    patch = body.model_dump(exclude={"note"})
+    check_outcome(body.outcome)
+    if body.outcome == "not_interested":
+        patch = {"status": "Disqualified", "disqualified_reason": body.disqualified_reason or body.note or "Not interested",
+                 **{f: None for f in domain.NEXT_ACTION_FIELDS}, "next_action_in_calendar": False}
+    else:
+        patch = body.model_dump(include={*domain.NEXT_ACTION_FIELDS, "next_action_in_calendar"})
+        if body.outcome == "moved_to_nurture":
+            patch["status"] = "Nurture"
+        elif body.outcome in _ADVANCE and before["status"] in _ORDER and _ORDER.index(before["status"]) < _ORDER.index(_ADVANCE[body.outcome]):
+            patch["status"] = _ADVANCE[body.outcome]
     merged = {**before, **patch}
     errors, _ = domain.validate_prospect(merged)
     raise_if_errors(errors)
     done = domain.next_action_label(before["next_action_code"], before["next_action_other"]) or "Action"
-    summary = f"Completed: {done}" + (f". {body.note}" if body.note else "")
     async with con.transaction():
-        await log_activity(con, "prospect", prospect_id, "action_completed", summary, user.id)
+        await log_activity(con, "prospect", prospect_id, "action_completed", completed_summary(done, body.outcome, body.note), user.id, body.outcome)
         patch["last_activity_at"] = await con.fetchval("SELECT now()")
         row = await update(con, "prospects", prospect_id, patch)
         await record_changes(con, "prospect", prospect_id, before, row, user.id)
+        if before["status"] != row["status"]:
+            await log_activity(con, "prospect", prospect_id, "status_change", f"Status: {before['status']} → {row['status']}", user.id)
     await integrations.after_save(request, con, "prospect", prospect_id, completed=True)
     return row
 

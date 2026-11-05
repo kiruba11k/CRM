@@ -6,6 +6,9 @@ import { useCanEdit, useSession } from '../session'
 import { ActivityCard, HistoryCard } from '../components/Timeline'
 import { FollowUpStatus, MeetingsCard, TaskStatus } from '../components/Meetings'
 import { GmailCard } from '../components/Gmail'
+import CompleteAction from '../components/CompleteAction'
+import { LifecyclePill } from './Prospects'
+import { nextActionLabel } from '../format'
 import type { Account, FormValue, FormValues, Issue, Opportunity, ProspectDetail } from '../types'
 import { Banner, ErrorBanner, NextActionFields, OwnerField, SelectField, StatusPill, TextField, WarningsBanner, changedFields, compact, useLoad, withCurrent } from '../ui'
 
@@ -52,7 +55,7 @@ function ConvertPanel({ prospect, accountName, accounts, onCancel }: { prospect:
         <NextActionFields value={form} onChange={setForm} errors={errors} />
       </div>
       <div className="row">
-        <button type="button" className="btn btn-dark" onClick={save}>Create opportunity</button>
+        <button type="button" className="btn btn-dark" onClick={save}>Create deal</button>
         <button type="button" className="btn" onClick={onCancel}>Cancel</button>
       </div>
     </section>
@@ -68,6 +71,8 @@ export default function ProspectRecord() {
   const [error, setError] = useState<ApiError | null>(null)
   const [saved, setSaved] = useState<Issue[] | null>(null)
   const [converting, setConverting] = useState(false)
+  const [completing, setCompleting] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
   const canEdit = useCanEdit(data?.owner_id)
 
   useEffect(() => {
@@ -94,34 +99,26 @@ export default function ProspectRecord() {
 
   return (
     <>
-      <div className="muted small"><Link to="/leads">Prospects</Link>{data.account_id && <> / <Link to={`/companies/${data.account_id}`}>{accountName || 'Account'}</Link></>}</div>
+      <div className="muted small"><Link to="/contacts">Contacts</Link>{data.account_id && <> / <Link to={`/companies/${data.account_id}`}>{accountName || 'Account'}</Link></>}</div>
       <div className="page-head">
         <div className="row">
           <h1>{data.full_name}</h1>
           <StatusPill status={data.status} />
+          {data.lifecycle && <LifecyclePill value={data.lifecycle} />}
         </div>
         <div className="row">
-          {canEdit && !closed && <button type="button" className="btn btn-outline" onClick={() => setConverting(true)}>Create opportunity</button>}
+          {canEdit && !closed && <button type="button" className="btn btn-outline" onClick={() => setConverting(true)}>Create deal</button>}
           {canEdit && <button type="button" className="btn btn-primary" onClick={save}>Save</button>}
         </div>
       </div>
-      {!canEdit && <Banner kind="warn">You can view this prospect. Only its owner, a manager or an admin can edit it.</Banner>}
+      {!canEdit && <Banner kind="warn">You can view this contact. Only its owner, a manager or an admin can edit it.</Banner>}
       <ErrorBanner error={error} onClose={() => setError(null)} />
       {saved && <Banner onClose={() => setSaved(null)}>Saved.</Banner>}
+      {notice && <Banner onClose={() => setNotice(null)}>{notice}</Banner>}
       <WarningsBanner warnings={saved} />
       {converting && <ConvertPanel prospect={data} accountName={accountName} accounts={accounts.data || []} onCancel={() => setConverting(false)} />}
-      <div className="cols">
-        <div className="col-main">
-          <section className="card strong" aria-label="Next action">
-            <div className="card-head"><h2>Next action</h2><span className="muted small">Same list as opportunities</span></div>
-            {closed ? <p className="muted" style={{ margin: 0 }}>Disqualified: no reminders.</p> : (
-              <>
-                <div className="grid-fields"><NextActionFields value={form} onChange={setForm} errors={errors} withCalendar /></div>
-                <FollowUpStatus followUp={data.follow_up} onChange={() => void reload()} />
-                <TaskStatus task={data.task} onChange={() => void reload()} />
-              </>
-            )}
-          </section>
+      <div className="cols three">
+        <div className="col-props">
           <section className="card" aria-label="Details">
             <h2>Details</h2>
             <div className="grid-fields">
@@ -139,16 +136,41 @@ export default function ProspectRecord() {
             </div>
             <TextField label="Notes" multiline value={form.notes} onChange={(v) => set('notes', v)} />
           </section>
+        </div>
+        <div className="col-main">
+          <section className="card strong" aria-label="Next action">
+            <div className="card-head"><h2>Next action</h2>
+              {canEdit && !closed && data.next_action_code && !completing && (
+                <div className="quick-acts"><button type="button" className="btn btn-dark" onClick={() => setCompleting(true)}>Complete action…</button></div>
+              )}
+            </div>
+            {closed ? <p className="muted" style={{ margin: 0 }}>Disqualified: no reminders.</p> : (
+              <>
+                <div className="grid-fields"><NextActionFields value={form} onChange={setForm} errors={errors} withCalendar /></div>
+                <FollowUpStatus followUp={data.follow_up} onChange={() => void reload()} />
+                <TaskStatus task={data.task} onChange={() => void reload()} />
+              </>
+            )}
+          </section>
+          {completing && (
+            <CompleteAction kind="prospect" id={id} title={data.full_name} current={nextActionLabel(lists, data.next_action_code, data.next_action_other)}
+              onCancel={() => setCompleting(false)} onDone={(msg) => { setCompleting(false); setNotice(msg); void reload() }} />
+          )}
           <ActivityCard activities={data.activities} postUrl={`/prospects/${id}/activities`} onAdded={() => void reload()} />
         </div>
         <div className="col-side">
-          <section className="card" aria-label="Opportunities">
-            <h2>Opportunities</h2>
+          <section className="card" aria-label="Company">
+            <div className="card-head"><h2>Company</h2>{data.account_id && <Link className="small" to={`/companies/${data.account_id}`}>Open</Link>}</div>
+            {data.account_id ? <Link to={`/companies/${data.account_id}`} style={{ fontWeight: 600 }}>{accountName || 'Company'}</Link>
+              : <p className="muted small" style={{ margin: 0 }}>Not linked to a company yet. Choose one under Details.</p>}
+          </section>
+          <section className="card" aria-label="Deals">
+            <div className="card-head"><h2>Deals</h2>{canEdit && !closed && <button type="button" className="btn btn-outline" onClick={() => setConverting(true)}>+ Create deal</button>}</div>
             {data.opportunities.length === 0 && <p className="muted small" style={{ margin: 0 }}>None yet.</p>}
             {data.opportunities.map((o) => (
               <Link key={o.id} to={`/opportunities/${o.id}`} className="deal-card">
                 <span className="title">{o.name}</span>
-                <span className="small muted">{o.stage}{o.on_nurture ? ' · on nurture' : ''}</span>
+                <span className="small muted">{o.stage}{o.on_nurture ? ' · on nurture' : ''}{o.role ? ` · ${o.role}` : ''}</span>
               </Link>
             ))}
           </section>
