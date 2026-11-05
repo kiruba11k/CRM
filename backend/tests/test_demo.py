@@ -20,7 +20,7 @@ def test_demo_data_round_trip(client):
     prospects = client.get("/api/prospects", params={"scope": "all"}, as_=ADMIN).json()
     assert len(prospects) == 25 and sum(p["account_id"] is None for p in prospects) == 3
     actions = client.get("/api/actions", params={"scope": "team"}, as_=ADMIN).json()["counts"]
-    assert actions["overdue"] > 0 and actions["today"] > 0 and actions["upcoming"] > 0 and actions["nurture"] == 2
+    assert actions["overdue"] > 0 and actions["today"] > 0 and actions["upcoming"] > 0 and actions["nurture"] == 3  # 2 deals on nurture + 1 contact set to Nurture
     assert len(client.get("/api/import/cleanup", params={"scope": "all"}, as_=ADMIN).json()) == 2
     assert len(client.get("/api/booking-links", as_=ADMIN).json()) == 2
     users = {u["email"]: u for u in client.get("/api/users", as_=ADMIN).json()}
